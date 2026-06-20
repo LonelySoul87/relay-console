@@ -15,6 +15,8 @@ Final review corrections. No new features.
 
 ### Tested
 - Re-ran the full headless smoke suite plus targeted runtime tests for each fix: storage-disabled shows the banner and stays usable, New relay clears state so a following import does not re-prompt and loads cleanly, Tidy persists the cleaned draft, and a duplicate-named orphan turn imports as unlinked rather than misattributed. All pass.
+- Completed a manual local-browser smoke test covering provider opening and copying, draft persistence, first-turn resume, back navigation, curated forwarding and stale-context review, synthesis, JSON save/import, Markdown export, presets, and mode switching. All checks passed.
+- The GitHub Pages-served build still needs one final browser check after Pages is enabled.
 
 ## v1.8.1
 
@@ -39,6 +41,3 @@ Release-candidate fixes after review. v1.8 was never published.
 - Commercial and security contact set to `lonelysoul.projects@gmail.com`.
 - CLA governing law set to France.
 - Privacy wording clarified: Relay Console does not upload session data, while **Copy & open** intentionally opens the configured provider website.
-
-### Still requires a human check before publishing
-- A one-time manual smoke test in a real browser, opened both as a local `file://` document and from GitHub Pages, confirming clipboard copy, opening a provider tab, JSON import, and `.md` / `.json` / session downloads. A headless DOM cannot enforce CSP or perform real downloads, so this last pass has to be done by eye.
