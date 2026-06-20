@@ -1,6 +1,7 @@
 name: Assemble release payload
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - main
@@ -13,7 +14,7 @@ permissions:
 
 jobs:
   assemble:
-    if: github.head_ref == 'initial-setup'
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'initial-setup'
     runs-on: ubuntu-latest
     steps:
       - name: Check out review branch
