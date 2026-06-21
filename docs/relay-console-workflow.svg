@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">Relay Console manual AI relay workflow</title>
+  <desc id="desc">Diagram of Relay Console, a local single-file HTML app for manually relaying prompts and answers between ChatGPT, Claude, Gemini, and other AI assistants.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#100f15"/>
+      <stop offset="1" stop-color="#221f2c"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#1f1b2a"/>
+      <stop offset="1" stop-color="#17141f"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .label{font:700 24px system-ui,-apple-system,Segoe UI,sans-serif;fill:#f6efe2}
+      .small{font:500 16px system-ui,-apple-system,Segoe UI,sans-serif;fill:#b9b3c8}
+      .mono{font:600 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#ffd98a}
+      .arrow{stroke:#f0a01f;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;fill:none}
+      .line{stroke:#433a55;stroke-width:2}
+      .pill{fill:#2b2538;stroke:#51475f;stroke-width:2}
+      .accent{fill:#f0a01f}
+      .blue{fill:#83d9ff}
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10" fill="none" stroke="#f0a01f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="520" rx="28" fill="url(#bg)"/>
+  <circle cx="1030" cy="100" r="220" fill="#f0a01f" opacity="0.08"/>
+  <circle cx="160" cy="460" r="200" fill="#83d9ff" opacity="0.06"/>
+
+  <text x="60" y="70" class="label" font-size="30">Manual AI relay, without APIs</text>
+  <text x="60" y="100" class="small">You copy prompts out, paste answers back, and Relay Console keeps the workflow structured.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="150" width="230" height="235" rx="18" fill="url(#card)" stroke="#40374f"/>
+    <text x="88" y="195" class="label">1. Ask</text>
+    <rect x="88" y="225" width="174" height="82" rx="12" fill="#121019" stroke="#393246"/>
+    <text x="106" y="255" class="small">One question</text>
+    <text x="106" y="280" class="small">for several AIs</text>
+    <rect x="88" y="330" width="82" height="28" rx="14" class="pill"/>
+    <text x="106" y="350" class="mono">local</text>
+  </g>
+
+  <path class="arrow" d="M300 267 C330 267 348 267 378 267" marker-end="url(#arrow)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="390" y="132" width="260" height="272" rx="18" fill="url(#card)" stroke="#40374f"/>
+    <text x="420" y="177" class="label">2. Relay</text>
+    <rect x="420" y="205" width="200" height="36" rx="10" class="pill"/>
+    <text x="438" y="229" class="small">ChatGPT</text>
+    <circle cx="594" cy="223" r="7" class="accent"/>
+    <rect x="420" y="252" width="200" height="36" rx="10" class="pill"/>
+    <text x="438" y="276" class="small">Claude</text>
+    <circle cx="594" cy="270" r="7" class="blue"/>
+    <rect x="420" y="299" width="200" height="36" rx="10" class="pill"/>
+    <text x="438" y="323" class="small">Gemini</text>
+    <circle cx="594" cy="317" r="7" fill="#bca7ff"/>
+    <text x="420" y="365" class="mono">copy → paste → save</text>
+  </g>
+
+  <path class="arrow" d="M660 267 C690 267 708 267 738 267" marker-end="url(#arrow)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="750" y="150" width="390" height="235" rx="18" fill="url(#card)" stroke="#40374f"/>
+    <text x="780" y="195" class="label">3. Compare and synthesize</text>
+    <line x1="780" y1="230" x2="1110" y2="230" class="line"/>
+    <text x="780" y="262" class="small">Debate mode: models respond to each other</text>
+    <text x="780" y="294" class="small">Blind mode: independent answers first</text>
+    <text x="780" y="326" class="small">Exports: Markdown transcript and JSON session</text>
+    <rect x="780" y="346" width="170" height="28" rx="14" fill="#332a3f" stroke="#51475f"/>
+    <text x="800" y="366" class="mono">final synthesis</text>
+  </g>
+</svg>

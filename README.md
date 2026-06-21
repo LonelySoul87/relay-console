@@ -1,20 +1,20 @@
 # Relay Console
 
-A single HTML file that helps you pass one question between several AI chatbots by hand, copy a prompt out, paste the answer back, and watch the conversation build, then merge it into one answer.
+**Relay Console is a local, offline, single-file HTML tool for manually relaying conversations between multiple AI assistants such as ChatGPT, Claude, Gemini, Perplexity, Copilot, Grok, DeepSeek, Mistral, Meta AI, Qwen, Kimi, Poe, or any custom chatbot.**
 
-No API keys. No backend. No build step. You open the file and it runs. Relay Console never uploads your questions, answers, or session data; you are the wire between the models.
+It helps you run a structured copy-paste relay: write one question, choose the assistants, copy a generated prompt into one chatbot, paste its answer back, then continue the conversation through the next model. Relay Console tracks the transcript, builds each turn's prompt, supports debate and blind-comparison modes, and helps merge the results into one final answer.
 
-## What it is
+No API keys. No backend. No build step. No account. No server storage. You open the HTML file locally and you remain the wire between the models.
 
-You subscribe to a few chatbots already (Claude, ChatGPT, Gemini, Perplexity, whatever). Their consumer plans don't expose an API, so you can't wire them together programmatically without paying again per token. Relay Console takes the other path: it keeps you in the loop and handles everything around the copy-paste. It builds each turn's prompt, bundling what's been said so far and telling the next model whose turn it is and to engage with it, tracks the whole transcript, and gives you one button that copies the prompt and opens the right chatbot.
+![Diagram of Relay Console, a local single-file HTML app for manually relaying prompts and answers between ChatGPT, Claude, Gemini, and other AI assistants.](docs/relay-console-workflow.svg)
 
-## What it is not
+## What is this?
 
-- It does not call any AI API, and it cannot. That is the point.
-- It does not automate the paste into your chat tabs. You do that step.
-- It does not run a server or store anything off your machine.
+Relay Console is for people who already use several AI chatbots but do not want to pay again for API usage or wire models together through a hosted service.
 
-If you want hands-off automation, this is the wrong tool. If you want to orchestrate models you already pay for without setting up APIs, paying separate API usage fees, or entrusting the relay itself to another service, this is built for exactly that.
+Instead of automating the models, Relay Console structures the manual copy-paste workflow. It prepares the prompt for each assistant, includes the relevant prior context, tells each model its role and turn, preserves the full transcript, and helps synthesize the results.
+
+Use it when you want ChatGPT, Claude, Gemini, Perplexity, Grok, DeepSeek, or other assistants to critique, compare, extend, or synthesize one another's answers, without giving Relay Console API access or remote storage.
 
 ## Quick start
 
@@ -23,6 +23,38 @@ If you want hands-off automation, this is the wrong tool. If you want to orchest
 3. Write a question, pick which chatbots you're using, and start the relay.
 
 Optionally, keep it as a bookmark or a local file for offline use.
+
+## What Relay Console is not
+
+- It does not call any AI API.
+- It does not automate pasting into chatbot tabs.
+- It does not inspect your browser tabs.
+- It does not run a backend server.
+- It does not upload your questions, answers, prompts, presets, or session data.
+- It is not an autonomous agent framework.
+
+If you want hands-off model automation, use an API-based orchestration tool. If you want a local, auditable, human-in-the-loop relay for consumer chatbot subscriptions, Relay Console is built for that.
+
+## Who this is for
+
+Relay Console is for people who:
+
+- Pay for multiple consumer AI assistants and want them to critique or compare one another.
+- Prefer manual review before each model sees the next prompt.
+- Want a structured transcript instead of a messy series of copy-pasted chats.
+- Do not want to set up API keys, server infrastructure, browser extensions, or automation scripts.
+- Care about keeping the relay tool local, offline, and inspectable.
+- Want to compare answers from several models before making a decision.
+
+Relay Console is probably not for people who want fully automated multi-agent systems, background workers, autonomous browsing, API routing, or hosted team collaboration.
+
+## Why manual relay?
+
+Most multi-model tools assume API access. That works well for developers, but it is awkward for people who already pay for consumer chatbot plans and do not want separate API billing.
+
+Relay Console takes the opposite path. It keeps the human in the loop and makes the copy-paste workflow structured, repeatable, and easier to audit. You decide what gets copied. You decide what gets pasted. You can trim context before forwarding it. You can stop or redirect the relay at any time.
+
+The goal is not to remove the human from the loop. The goal is to make the loop less chaotic.
 
 ## Privacy and offline
 
@@ -43,6 +75,18 @@ Autosave uses your browser's local storage, so your session survives a refresh w
 - **Light and dark themes** that follow your system.
 - **Markdown and JSON export/import**, plus first-run guidance for newcomers.
 
+## How Relay Console compares
+
+Relay Console is different from API agent frameworks because it does not call models programmatically.
+
+It is different from browser extensions because it does not need to inspect, inject into, or automate chatbot tabs.
+
+It is different from hosted AI workspaces because it has no backend account, server database, or remote relay service.
+
+It is different from a plain text document because it tracks turns, roles, prompts, curated context, response format, exports, imports, and final synthesis in one structured workspace.
+
+Relay Console is best understood as a manual AI relay console: a local tool that helps a person coordinate several AI assistants by hand.
+
 ## The chatbot list, and how it stays current
 
 The built-in suggestions are a short, static array near the top of the source (`PROVIDERS`). Each entry is just a brand name, a stable homepage, and a color. They are editable suggestions, never authoritative config, so the worst case for a stale entry is a redirect you fix once in a text box.
@@ -56,7 +100,7 @@ To keep it from becoming a maintenance trap, the list follows four rules. If you
 
 ## How this was built
 
-Every version of this tool was critiqued by running the question through the tool itself: the same four models, in a relay, arguing about what to build or fix next. The release history is a record of that, including the round that caught the tool quietly phoning home to a font CDN, which is why it no longer does.
+Versions of this tool are critiqued by running questions through the tool itself: multiple models, in a relay, arguing about what to build or fix next. The release history is a record of that, including the round that caught the tool quietly phoning home to a font CDN, which is why it no longer does.
 
 ## Versioning
 
