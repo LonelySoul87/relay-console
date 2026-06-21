@@ -62,6 +62,14 @@ Every version of this tool was critiqued by running the question through the too
 
 Each release is a self-contained file named by version (for example `relay-console-v1.8.3.html`). There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones.
 
+## Support
+
+I build local-first software projects, including Relay Console. If this tool saves you time or helps your workflow, you can support current and future development here:
+
+[Support LonelySoul87 Projects on Ko-fi](https://ko-fi.com/lonelysoul87projects)
+
+Support is optional. Relay Console remains free, offline, and usable without accounts, tracking, or paid features.
+
 ## Contributing
 
 Issues and pull requests welcome, especially provider-list updates that follow the four rules above. Because the whole thing is one file with no build, a change is just an edit to that file.
