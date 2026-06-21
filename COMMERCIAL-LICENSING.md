@@ -8,4 +8,4 @@ Commercial terms are negotiated separately and are not granted by this repositor
 
 Contact: [lonelysoul.projects@gmail.com](mailto:lonelysoul.projects@gmail.com)
 
-Copyright (C) 2026 Lonely Soul.
+Copyright (C) 2026 LonelySoul87 Projects.
