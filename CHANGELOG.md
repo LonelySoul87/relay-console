@@ -56,7 +56,7 @@ Release-candidate fixes after review. v1.8 was never published.
 - Added an automated runtime smoke test that drives the real page in a headless DOM: boot, role-suggestion default, Start, copy, answer-draft persistence, Save and advance, Back, curate/trim with a fail-closed re-edit and review flag, export and save, preset save/load/delete, mode switch, the no-role escape, a forced storage-write failure, a refresh-and-resume on turn 1, a full synthesis completion, and operation with `localStorage` disabled. All checks pass.
 
 ### Release preparation
-- Public maintainer identity changed to **Lonely Soul / @LonelySoul87**.
+- Public maintainer identity changed to **LonelySoul87 Projects / @LonelySoul87**.
 - Commercial and security contact set to `lonelysoul.projects@gmail.com`.
 - CLA governing law set to France.
 - Privacy wording clarified: Relay Console does not upload session data, while **Copy & open** intentionally opens the configured provider website.
