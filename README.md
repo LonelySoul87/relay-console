@@ -6,6 +6,8 @@ It helps you run a structured copy-paste relay: write one question, choose the a
 
 No API keys. No backend. No build step. No account. No server storage. You open the HTML file locally and you remain the wire between the models.
 
+Project landing page: [lonelysoul87.github.io/relay-console/landing.html](https://lonelysoul87.github.io/relay-console/landing.html)
+
 ![Diagram of Relay Console, a local single-file HTML app for manually relaying prompts and answers between ChatGPT, Claude, Gemini, and other AI assistants.](docs/relay-console-workflow.svg)
 
 ## What is this?
