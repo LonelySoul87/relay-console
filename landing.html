@@ -3,50 +3,264 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Relay Console is a local, offline, single-file HTML tool for manually relaying conversations between ChatGPT, Claude, Gemini, and other AI assistants. No API keys, backend, or installation required.">
-<title>Relay Console — Local Offline AI Assistant Relay</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none';">
+<meta name="description" content="Relay Console is a local, offline, single-file HTML tool for manually relaying conversations between ChatGPT, Claude, Gemini, and other AI assistants. No API keys, no backend, no extension, no installation.">
+<meta property="og:title" content="Relay Console: local, offline, manual AI relay">
+<meta property="og:description" content="A local, offline, single-file HTML tool for manually relaying conversations between ChatGPT, Claude, Gemini, and other AI assistants.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:,">
+<title>Relay Console: local, offline, manual AI relay</title>
 <style>
-  :root{color-scheme:light dark;--bg:#100f15;--panel:#1a1822;--line:#2f2b3a;--text:#ece9f3;--muted:#a49bb8;--signal:#f4a52e;--signal2:#ffce7a;--ink:#1c1303}
-  @media (prefers-color-scheme:light){:root{--bg:#f3f1ec;--panel:#fff;--line:#e4dfd4;--text:#1b1822;--muted:#686174;--signal:#f0a01f;--signal2:#ffd98a;--ink:#2a1c02}}
-  *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:32px 20px 72px}main{max-width:980px;margin:auto}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:clamp(22px,5vw,44px);margin:16px 0}.eyebrow{color:var(--signal);font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}h1{font-size:clamp(38px,7vw,68px);line-height:.96;letter-spacing:-.05em;margin:0 0 18px}h2{font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.lead{font-size:clamp(18px,2.5vw,23px)}.muted{color:var(--muted)}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}a.button{display:inline-flex;align-items:center;min-height:44px;padding:10px 18px;border-radius:11px;text-decoration:none;font-weight:700;border:1px solid var(--line);color:var(--text)}a.primary{color:var(--ink);background:linear-gradient(180deg,var(--signal2),var(--signal));border-color:transparent}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.mini{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+  :root{
+    color-scheme: light dark;
+    --bg:#0f0e14; --bg-2:#14121c; --panel:#191722; --panel-2:#211d2d;
+    --line:#2e2a39; --text:#ece9f3; --muted:#a49bb8; --faint:#766e88;
+    --signal:#f4a52e; --signal-2:#ffce7a; --accent-text:#ffbf52; --ink:#1c1303;
+    --ring:rgba(244,165,46,.45); --you:#f4a52e; --console:#9b8cff;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --maxw:1040px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f2ec; --bg-2:#eceadf; --panel:#ffffff; --panel-2:#faf8f2;
+      --line:#e4dfd4; --text:#1b1822; --muted:#5e5870; --faint:#8b8498;
+      --signal:#e8980f; --signal-2:#ffd98a; --accent-text:#a86a06; --ink:#2a1c02;
+      --ring:rgba(232,152,15,.32); --you:#c47e0a; --console:#6a5acf;
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; font-family:var(--sans); background:var(--bg); color:var(--text);
+    line-height:1.62; letter-spacing:-.005em;
+    background-image:radial-gradient(900px 500px at 80% -10%, rgba(244,165,46,.10), transparent 70%);
+    background-image:radial-gradient(900px 500px at 80% -10%, color-mix(in srgb,var(--signal) 9%, transparent), transparent 70%);
+    background-repeat:no-repeat;
+  }
+  main{max-width:var(--maxw); margin:0 auto; padding:28px 22px 28px}
+  section{margin:0 0 18px}
+  a{color:var(--accent-text)}
+  h1,h2,h3{margin:0}
+
+  /* ---------- type ---------- */
+  .eyebrow{font-family:var(--mono); font-size:11.5px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:var(--accent-text); margin:0 0 14px}
+  h1{font-size:clamp(40px,8vw,76px); line-height:.94; letter-spacing:-.045em; font-weight:800}
+  .lead{font-size:clamp(18px,2.4vw,24px); line-height:1.4; margin:18px 0 0; max-width:30ch; font-weight:500}
+  .sub{color:var(--muted); font-size:clamp(15px,1.6vw,17px); margin:16px 0 0; max-width:58ch}
+  .sectionhead{font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+
+  /* ---------- surfaces ---------- */
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--line); border-radius:20px; padding:clamp(24px,4.5vw,46px)}
+  .hero{position:relative; overflow:hidden}
+  .hero::after{content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+    box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 8%, transparent)}
+
+  /* ---------- buttons ---------- */
+  .actions{display:flex; flex-wrap:wrap; gap:12px; margin-top:28px}
+  .btn{display:inline-flex; align-items:center; gap:9px; min-height:46px; padding:11px 19px; border-radius:12px;
+    text-decoration:none; font-weight:650; font-size:15px; border:1px solid var(--line); color:var(--text);
+    background:var(--bg-2); transition:transform .14s ease, border-color .14s ease, box-shadow .14s ease}
+  .btn:hover{transform:translateY(-1px); border-color:var(--signal); border-color:color-mix(in srgb,var(--signal) 55%, var(--line))}
+  .btn:focus-visible{outline:none; box-shadow:0 0 0 3px var(--ring)}
+  .btn.primary{color:var(--ink); border-color:transparent; background:linear-gradient(180deg,var(--signal-2),var(--signal)); font-weight:750}
+  .btn.primary:hover{box-shadow:0 6px 20px -8px var(--signal)}
+  .btn svg{width:17px; height:17px}
+  .trustline{margin:20px 0 0; font-family:var(--mono); font-size:11.5px; letter-spacing:.04em; color:var(--faint)}
+  .trustline b{color:var(--muted); font-weight:600}
+  .offnote{margin:10px 0 0; font-size:13px; color:var(--muted); max-width:60ch}
+
+  /* ---------- relay signature ---------- */
+  .relaywrap{margin-top:6px}
+  .relayhead{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px}
+  .relayhead h2{font-size:clamp(22px,3vw,30px); letter-spacing:-.03em; font-weight:750}
+  .relaynote{color:var(--muted); max-width:62ch; margin:8px 0 26px; font-size:15.5px}
+  .relaynote b{color:var(--text); font-weight:600}
+
+  .track{display:flex; align-items:stretch; gap:0}
+  .node{flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; text-align:center; padding:0 6px}
+  .disc{width:54px; height:54px; border-radius:50%; display:grid; place-items:center; border:1px solid var(--line);
+    background:var(--bg-2); color:var(--muted); position:relative}
+  .disc svg{width:24px; height:24px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+  .node.you .disc{color:var(--you); border-color:var(--you); border-color:color-mix(in srgb,var(--you) 55%, var(--line)); box-shadow:0 0 0 4px rgba(244,165,46,.14); box-shadow:0 0 0 4px color-mix(in srgb,var(--you) 14%, transparent)}
+  .node.console .disc{color:var(--console); border-color:var(--console); border-color:color-mix(in srgb,var(--console) 50%, var(--line))}
+  .node .tag{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; margin-top:12px}
+  .node.you .tag{color:var(--you)} .node.console .tag{color:var(--console)} .node.loop .tag{color:var(--faint)}
+  .node .ntitle{font-size:13.5px; font-weight:650; margin-top:4px; line-height:1.25}
+  .node .ncap{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.35}
+  .node .meta-col{display:flex; flex-direction:column; align-items:center}
+  .sep{flex:0 0 auto; align-self:flex-start; margin-top:26px; color:var(--faint); display:grid; place-items:center; width:18px}
+  .sep svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+
+  .steps{list-style:none; counter-reset:s; margin:30px 0 0; padding:0; display:grid; gap:12px}
+  .steps li{counter-increment:s; position:relative; padding:14px 16px 14px 52px; border:1px solid var(--line); border-radius:12px; background:var(--bg-2); font-size:15px}
+  .steps li::before{content:counter(s,decimal-leading-zero); position:absolute; left:16px; top:13px; font-family:var(--mono); font-size:12px; font-weight:600; color:var(--accent-text)}
+
+  /* ---------- value cards ---------- */
+  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+  .mini{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--line); border-radius:16px; padding:22px; transition:transform .14s ease, border-color .14s ease}
+  .mini:hover{transform:translateY(-2px); border-color:var(--signal); border-color:color-mix(in srgb,var(--signal) 35%, var(--line))}
+  .mini .ico{width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:var(--bg-2); border:1px solid var(--line); color:var(--accent-text); margin-bottom:14px}
+  .mini .ico svg{width:19px; height:19px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+  .mini h3{font-size:16px; font-weight:700; letter-spacing:-.01em}
+  .mini p{margin:7px 0 0; color:var(--muted); font-size:14px}
+
+  /* ---------- what it is not ---------- */
+  .notgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:18px}
+  .not{display:flex; gap:11px; align-items:flex-start; padding:13px 15px; border:1px solid var(--line); border-radius:12px; background:var(--bg-2)}
+  .not .x{flex:0 0 auto; width:20px; height:20px; border-radius:6px; display:grid; place-items:center; background:rgba(244,165,46,.16); background:color-mix(in srgb,var(--signal) 16%, transparent); color:var(--accent-text); font-family:var(--mono); font-weight:700; font-size:13px; margin-top:1px}
+  .not span.t{font-size:14.5px; font-weight:550}
+  .not span.t small{display:block; color:var(--muted); font-weight:400; font-size:13px; margin-top:2px}
+
+  /* ---------- footer ---------- */
+  footer{margin-top:8px; padding:24px 4px 8px; color:var(--muted); font-size:13.5px}
+  footer .priv{max-width:74ch}
+  footer .meta{display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:16px; font-family:var(--mono); font-size:12px; color:var(--faint)}
+  footer .meta a{color:var(--muted); text-decoration:none}
+  footer .meta a:hover{color:var(--accent-text)}
+  footer .affil{margin:14px 0 0; font-size:12px; color:var(--faint); max-width:78ch}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:780px){
+    .grid{grid-template-columns:1fr}
+    .notgrid{grid-template-columns:1fr}
+    .track{flex-direction:column; align-items:stretch; gap:0; max-width:420px; margin:0 auto}
+    .node{flex-direction:row; align-items:center; text-align:left; gap:14px; padding:10px 0}
+    .node .meta-col{display:flex; flex-direction:column; align-items:flex-start}
+    .node .tag{margin-top:0}
+    .node .ntitle{margin-top:2px}
+    .disc{flex:0 0 auto}
+    .sep{align-self:flex-start; margin:0 0 0 26px; transform:rotate(90deg); height:14px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important}
+  }
+  .skip{position:absolute; left:-9999px}
+  .skip:focus{left:12px; top:12px; background:var(--panel); border:1px solid var(--signal); padding:8px 12px; border-radius:8px; z-index:9}
 </style>
 </head>
 <body>
+<a class="skip" href="#how">Skip to how it works</a>
 <main>
-<section class="card">
-<p class="eyebrow">Manual AI relay • local • no API</p>
-<h1>Relay Console</h1>
-<p class="lead">A local, offline, single-file HTML tool for manually relaying conversations between ChatGPT, Claude, Gemini, and other AI assistants.</p>
-<p class="muted">You copy prompts out. You paste answers back. Relay Console keeps the multi-model conversation structured and easier to synthesize.</p>
-<div class="actions">
-<a class="button primary" href="index.html">Open Relay Console</a>
-<a class="button" href="https://github.com/LonelySoul87/relay-console/releases/latest">Download latest release</a>
-<a class="button" href="https://github.com/LonelySoul87/relay-console">View on GitHub</a>
-</div>
-</section>
-<section class="grid">
-<div class="mini"><h2>Local and offline</h2><p class="muted">Open the saved HTML file in your browser. The tool itself does not need a server or account.</p></div>
-<div class="mini"><h2>Human-in-the-loop</h2><p class="muted">You decide what gets copied, pasted, trimmed, skipped, or synthesized at every step.</p></div>
-<div class="mini"><h2>No API orchestration</h2><p class="muted">Relay Console does not call model APIs or automate chatbot tabs. It organizes manual relay work.</p></div>
-</section>
-<section class="card">
-<h2>How it works</h2>
-<ol>
-<li>Write one question and choose the assistants.</li>
-<li>Relay Console builds a prompt with role framing and relevant context.</li>
-<li>Copy the prompt into the selected chatbot, then paste the answer back.</li>
-<li>Continue through debate or blind-comparison mode, then synthesize the results.</li>
-</ol>
-</section>
-<section class="card">
-<h2>What it is not</h2>
-<ul>
-<li>Not an autonomous agent framework.</li>
-<li>Not a browser extension.</li>
-<li>Not a hosted AI workspace.</li>
-<li>Not a tab automation tool.</li>
-</ul>
-</section>
+
+  <!-- HERO -->
+  <section class="card hero">
+    <p class="eyebrow">Manual AI relay • local • no API</p>
+    <h1>Relay Console</h1>
+    <p class="lead">A local, offline, single&#8209;file HTML tool for relaying a question or task between ChatGPT, Claude, Gemini, and other AI assistants, by hand.</p>
+    <p class="sub">You copy each prompt out and paste each answer back. Relay Console keeps the multi&#8209;model conversation organized: the role framing, the running transcript, and the final synthesis. Nothing runs on its own.</p>
+    <div class="actions">
+      <a class="btn primary" href="index.html">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        Open Relay Console
+      </a>
+      <a class="btn" href="https://github.com/LonelySoul87/relay-console/releases/latest">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14"/></svg>
+        Download latest release
+      </a>
+      <a class="btn" href="https://github.com/LonelySoul87/relay-console">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4M13 5l-2 14"/></svg>
+        View source on GitHub
+      </a>
+    </div>
+    <p class="trustline"><b>Open source</b> &nbsp;·&nbsp; GPL&#8209;3.0&#8209;only, commercial license available &nbsp;·&nbsp; single&#8209;file app &nbsp;·&nbsp; nothing to install</p>
+    <p class="offnote">Relay Console itself can run offline; provider websites require their own internet connection.</p>
+  </section>
+
+  <!-- SIGNATURE: relay flow -->
+  <section class="card relaywrap" id="how">
+    <div class="relayhead">
+      <p class="eyebrow" style="margin:0">How it works</p>
+      <h2>You control every handoff</h2>
+    </div>
+    <p class="relaynote">Relay Console never contacts a model on its own. Every handoff is yours: <b>it frames the prompt, you carry it to the chatbot, you bring the answer back.</b> The tool keeps track so a four&#8209;way exchange stays legible instead of scattered across tabs.</p>
+
+    <div class="track" aria-hidden="true">
+      <div class="node you">
+        <div class="disc"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M5 5h14v10H8l-3 3z"/><path d="M9 9h6M9 12h4"/></svg></div>
+        <div class="meta-col"><span class="tag">you</span><span class="ntitle">Question</span><span class="ncap">Write one question, pick the assistants.</span></div>
+      </div>
+      <div class="sep"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="node console">
+        <div class="disc"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 10l2 2-2 2M13 14h3"/></svg></div>
+        <div class="meta-col"><span class="tag">relay console</span><span class="ntitle">Framed prompt</span><span class="ncap">Adds role framing and the context so far.</span></div>
+      </div>
+      <div class="sep"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="node you">
+        <div class="disc"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M7 8h9a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3H10l-3 2v-2a3 3 0 0 1-3-3v-3a3 3 0 0 1 3-3z"/></svg></div>
+        <div class="meta-col"><span class="tag">you</span><span class="ntitle">Into a chatbot</span><span class="ncap">Copy it; open the assistant; paste.</span></div>
+      </div>
+      <div class="sep"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="node you">
+        <div class="disc"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 4h6v3H9z"/><path d="M7 6h10v14H7z"/><path d="M12 16l-3-3m3 3l3-3m-3 3V9"/></svg></div>
+        <div class="meta-col"><span class="tag">you</span><span class="ntitle">Answer back</span><span class="ncap">Paste the reply into Relay Console.</span></div>
+      </div>
+      <div class="sep"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="node loop">
+        <div class="disc"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13-6l3 2M20 12a8 8 0 0 1-13 6l-3-2"/><path d="M20 4v4h-4M4 20v-4h4"/></svg></div>
+        <div class="meta-col"><span class="tag">repeat</span><span class="ntitle">Next assistant</span><span class="ncap">Debate, or blind comparison.</span></div>
+      </div>
+      <div class="sep"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="node console">
+        <div class="disc"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M5 5v4a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4V5"/><path d="M12 13v6M9 19h6"/></svg></div>
+        <div class="meta-col"><span class="tag">relay console</span><span class="ntitle">Synthesis</span><span class="ncap">Frames a final merge you run.</span></div>
+      </div>
+    </div>
+
+    <ol class="steps">
+      <li>Write one question and choose the assistants.</li>
+      <li>Relay Console builds a prompt with role framing and the relevant context.</li>
+      <li>Copy the prompt into the selected chatbot, then paste the answer back.</li>
+      <li>Continue through debate or blind&#8209;comparison mode, then synthesize the results.</li>
+    </ol>
+  </section>
+
+  <!-- VALUE -->
+  <section>
+    <h2 class="sectionhead" style="margin:0 0 12px 4px">Why use it</h2>
+    <div class="grid">
+    <div class="mini">
+      <div class="ico"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 5h16v11H4z"/><path d="M9 20h6M12 16v4"/><path d="M8 9l-2 2 2 2"/></svg></div>
+      <h3>Local and offline</h3>
+      <p>Open the saved HTML file in your browser. There is no server and no account; the tool runs entirely on your machine.</p>
+    </div>
+    <div class="mini">
+      <div class="ico"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></div>
+      <h3>Human-in-the-loop</h3>
+      <p>You decide what gets copied, pasted, trimmed, skipped, or synthesized at every step. Nothing moves without you.</p>
+    </div>
+    <div class="mini">
+      <div class="ico"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 7V4M15 7V4M8 7h8v3a4 4 0 0 1-8 0z"/><path d="M12 14v3a3 3 0 0 0 3 3h2"/><path d="M4 5l16 14"/></svg></div>
+      <h3>No API orchestration</h3>
+      <p>Relay Console does not call model APIs or drive chatbot tabs. It organizes the manual relay; the carrying across is yours.</p>
+    </div>
+    </div>
+  </section>
+
+  <!-- WHAT IT IS NOT -->
+  <section class="card">
+    <h2 class="sectionhead">What Relay Console is not</h2>
+    <div class="notgrid">
+      <div class="not"><span class="x">✕</span><span class="t">An autonomous agent framework<small>It takes no action on its own and makes no calls for you.</small></span></div>
+      <div class="not"><span class="x">✕</span><span class="t">A browser extension<small>Nothing to install, no permissions, no access to your tabs.</small></span></div>
+      <div class="not"><span class="x">✕</span><span class="t">A hosted AI workspace<small>No accounts and no servers. The file is the whole product.</small></span></div>
+      <div class="not"><span class="x">✕</span><span class="t">A tab automation tool<small>It does not type into, read, or control other sites.</small></span></div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <p class="priv">Relay Console itself runs in your browser and does not upload your questions, answers, or sessions. When you choose to open an assistant, your browser opens that provider's own site; anything you paste there is handled under that provider's terms.</p>
+    <div class="meta">
+      <span>© 2026 LonelySoul87 Projects</span>
+      <span>GPL-3.0-only, commercial license available</span>
+      <a href="https://github.com/LonelySoul87/relay-console">github.com/LonelySoul87/relay-console</a>
+    </div>
+    <p class="affil">ChatGPT, Claude, Gemini, and other provider names are mentioned only to describe compatible services. Relay Console is not affiliated with those providers.</p>
+  </footer>
+
 </main>
 </body>
 </html>
