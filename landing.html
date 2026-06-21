@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Relay Console is a local, offline, single-file HTML tool for manually relaying conversations between ChatGPT, Claude, Gemini, and other AI assistants. No API keys, backend, or installation required.">
+<title>Relay Console — Local Offline AI Assistant Relay</title>
+<style>
+  :root{color-scheme:light dark;--bg:#100f15;--panel:#1a1822;--line:#2f2b3a;--text:#ece9f3;--muted:#a49bb8;--signal:#f4a52e;--signal2:#ffce7a;--ink:#1c1303}
+  @media (prefers-color-scheme:light){:root{--bg:#f3f1ec;--panel:#fff;--line:#e4dfd4;--text:#1b1822;--muted:#686174;--signal:#f0a01f;--signal2:#ffd98a;--ink:#2a1c02}}
+  *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding:32px 20px 72px}main{max-width:980px;margin:auto}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:clamp(22px,5vw,44px);margin:16px 0}.eyebrow{color:var(--signal);font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}h1{font-size:clamp(38px,7vw,68px);line-height:.96;letter-spacing:-.05em;margin:0 0 18px}h2{font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.lead{font-size:clamp(18px,2.5vw,23px)}.muted{color:var(--muted)}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}a.button{display:inline-flex;align-items:center;min-height:44px;padding:10px 18px;border-radius:11px;text-decoration:none;font-weight:700;border:1px solid var(--line);color:var(--text)}a.primary{color:var(--ink);background:linear-gradient(180deg,var(--signal2),var(--signal));border-color:transparent}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.mini{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<section class="card">
+<p class="eyebrow">Manual AI relay • local • no API</p>
+<h1>Relay Console</h1>
+<p class="lead">A local, offline, single-file HTML tool for manually relaying conversations between ChatGPT, Claude, Gemini, and other AI assistants.</p>
+<p class="muted">You copy prompts out. You paste answers back. Relay Console keeps the multi-model conversation structured and easier to synthesize.</p>
+<div class="actions">
+<a class="button primary" href="index.html">Open Relay Console</a>
+<a class="button" href="https://github.com/LonelySoul87/relay-console/releases/latest">Download latest release</a>
+<a class="button" href="https://github.com/LonelySoul87/relay-console">View on GitHub</a>
+</div>
+</section>
+<section class="grid">
+<div class="mini"><h2>Local and offline</h2><p class="muted">Open the saved HTML file in your browser. The tool itself does not need a server or account.</p></div>
+<div class="mini"><h2>Human-in-the-loop</h2><p class="muted">You decide what gets copied, pasted, trimmed, skipped, or synthesized at every step.</p></div>
+<div class="mini"><h2>No API orchestration</h2><p class="muted">Relay Console does not call model APIs or automate chatbot tabs. It organizes manual relay work.</p></div>
+</section>
+<section class="card">
+<h2>How it works</h2>
+<ol>
+<li>Write one question and choose the assistants.</li>
+<li>Relay Console builds a prompt with role framing and relevant context.</li>
+<li>Copy the prompt into the selected chatbot, then paste the answer back.</li>
+<li>Continue through debate or blind-comparison mode, then synthesize the results.</li>
+</ol>
+</section>
+<section class="card">
+<h2>What it is not</h2>
+<ul>
+<li>Not an autonomous agent framework.</li>
+<li>Not a browser extension.</li>
+<li>Not a hosted AI workspace.</li>
+<li>Not a tab automation tool.</li>
+</ul>
+</section>
+</main>
+</body>
+</html>
