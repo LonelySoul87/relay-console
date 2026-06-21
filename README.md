@@ -60,7 +60,7 @@ Every version of this tool was critiqued by running the question through the too
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v1.8.2.html`). There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones.
+Each release is a self-contained file named by version (for example `relay-console-v1.8.3.html`). There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones.
 
 ## Contributing
 

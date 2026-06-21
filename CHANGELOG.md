@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.8.3
+
+Maintenance release. Correctness, accessibility, and identity-safe corrections. No new features.
+
+### Fixed
+- **Truthful, race-safe copy status.** "Copied" now appears only after a confirmed copy; a failure shows a persistent "select the prompt and copy it manually" message, and an asynchronous write shows "Copying..." until it settles. **Copy & open** still opens the provider on the original click, and opens it even when the copy fails. Overlapping copy attempts are tracked by an incrementing id, so a slow earlier attempt can never overwrite the status produced by a newer one.
+- **Dependency-aware prompt staleness.** When an upstream answer or its forwarded context changes, a manually edited downstream prompt is flagged only if its generated prompt actually uses that content: later Debate prompts depend on earlier forwarded answers, and the synthesis prompt depends on every non-synthesis answer, while independent Blind answer prompts depend on nothing and are never flagged. Each flag offers Regenerate (rebuild from current context, discarding the edit) or Keep, reviewed (keep the edit, clear the flag). Unedited prompts keep rebuilding automatically and are never flagged.
+
+### Accessibility
+- The copy-status element is announced to assistive technology (`role="status"`, `aria-live="polite"`, `aria-atomic="true"`), and the onboarding coach marks the copy step complete only on a confirmed copy, so it never contradicts a visible failure.
+
+### Internal
+- The temporary textarea used by the synchronous copy path is now removed in a `finally` block, so it cannot leak if focus, selection, or `execCommand` throws.
+
+### Compatibility
+- v1.8.2 sessions import into v1.8.3 unchanged.
+- v1.8.3 sessions remain readable by v1.8.2.
+- v1.8.2 ignores the new `promptStale` field and may discard it if it re-exports the session; answers, forwarding, prompts, cursor, and completion state are unaffected.
+
 ## v1.8.2
 
 Final review corrections. No new features.
@@ -16,7 +35,7 @@ Final review corrections. No new features.
 ### Tested
 - Re-ran the full headless smoke suite plus targeted runtime tests for each fix: storage-disabled shows the banner and stays usable, New relay clears state so a following import does not re-prompt and loads cleanly, Tidy persists the cleaned draft, and a duplicate-named orphan turn imports as unlinked rather than misattributed. All pass.
 - Completed a manual local-browser smoke test covering provider opening and copying, draft persistence, first-turn resume, back navigation, curated forwarding and stale-context review, synthesis, JSON save/import, Markdown export, presets, and mode switching. All checks passed.
-- The GitHub Pages-served build still needs one final browser check after Pages is enabled.
+- The GitHub Pages-served build was enabled and tested successfully.
 
 ## v1.8.1
 
