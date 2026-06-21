@@ -1,6 +1,6 @@
 # Relay Console Individual Contributor License Agreement
 
-Thank you for contributing to Relay Console (the "Project"), maintained by Lonely Soul (GitHub: @LonelySoul87) (the "Maintainer"). This Agreement records the terms under which you contribute. It exists so the Maintainer can offer the Project under both the GNU General Public License version 3 (GPLv3) and separate commercial licenses, while you keep ownership of your work.
+Thank you for contributing to Relay Console (the "Project"), maintained by LonelySoul87 Projects (GitHub: @LonelySoul87) (the "Maintainer"). This Agreement records the terms under which you contribute. It exists so the Maintainer can offer the Project under both the GNU General Public License version 3 (GPLv3) and separate commercial licenses, while you keep ownership of your work.
 
 By submitting a contribution to the Project (for example, by opening a pull request), you agree to the following terms for that contribution and for all contributions you submit to the Project in future.
 
