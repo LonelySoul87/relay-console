@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.8.4
+
+Maintenance release for project presentation and release provenance. No behavior changes from the current app state.
+
+### Changed
+- Updated public project branding to **LonelySoul87 Projects** across the app and project documents.
+- Added discoverability documentation, announcement copy, and page-copy guidance.
+- Added a standalone GitHub Pages landing page and linked it from the README.
+- Improved README positioning for the local, offline, manual AI relay workflow.
+
+### Release integrity
+- Restored `relay-console-v1.8.3.html` to its original released contents so the v1.8.3 artifact remains immutable.
+- Added `relay-console-v1.8.4.html` as the current versioned release file.
+- Added `SHA256SUMS.txt` for versioned release artifact checksums.
+
 ## v1.8.3
 
 Maintenance release. Correctness, accessibility, and identity-safe corrections. No new features.

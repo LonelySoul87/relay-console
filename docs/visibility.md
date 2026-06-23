@@ -67,7 +67,7 @@ Use release titles that explain the category, not only the version.
 
 Examples:
 
-- Relay Console v1.8.3 — single-file offline AI relay tool
-- Relay Console v1.8.3 — local HTML app for relaying ChatGPT, Claude, Gemini, and other assistants
+- Relay Console v1.8.4 — single-file offline AI relay tool
+- Relay Console v1.8.4 — local HTML app for relaying ChatGPT, Claude, Gemini, and other assistants
 
-Keep versioned assets such as `relay-console-v1.8.3.html`. Consider also attaching a stable `relay-console.html` asset for nontechnical users.
+Keep versioned assets such as `relay-console-v1.8.4.html`. Consider also attaching a stable `relay-console.html` asset for nontechnical users.
