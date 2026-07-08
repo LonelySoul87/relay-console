@@ -2,3 +2,4 @@ a247da6267608fe00049aa01e235a37d09a02c6a430c9e71734dce17d2b3d85a  relay-console-
 e3f686159ae2c81a709d8adc0327da707aec9cd7fcfa9f0a843e4a0a4959cf6c  relay-console-v1.8.3.html
 9bae6f9c9b73e0a9738dfba033b0553f3e54e2712102df35dd146d2f869c4c99  relay-console-v1.8.4.html
 be52507ca7008e0950989542a81b7588690c7a2b2df1646da29a771d92e1b8a9  relay-console-v1.9.0.html
+bb4712fce29d7e032fa2fad6d803aa01d933141e134d3793ae49eecac92af5df  relay-console-v2.0.0-draft.html

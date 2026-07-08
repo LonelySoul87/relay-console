@@ -1,0 +1,17 @@
+# Local release-workspace folders
+/archive/
+/branding/
+/drafts/
+/landing/
+/notes/
+/releases/
+/sessions/
+/v*-latest/
+
+# Local helper scripts and workspace notes
+/_GET_*.bat
+/WORKSPACE_MAP.md
+
+# Assistant/tooling metadata
+/.agents/
+/.codex/
