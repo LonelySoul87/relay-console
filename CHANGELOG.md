@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.9.0
+
+Feature release. Sessions remain interchangeable with v1.8.x: v1.8.x files
+import unchanged, and v1.9.0 sessions remain readable by v1.8.x, which
+ignores the new optional `synthPid` field.
+
+### Added
+- **Synthesis runner.** When a relay ends in a synthesis turn, you can pick
+  at setup which chatbot receives the merge prompt; Copy & open then opens
+  that tab. Optional — leaving it unset keeps the old behavior.
+- **Grid view.** The transcript can switch between the classic list and a
+  side-by-side grid, which is the honest way to compare a Blind round
+  before synthesis. The choice is remembered.
+- **The question stays visible during the run** in a collapsible card
+  above the relay lane.
+- **Manual theme override** (auto / dark / light), remembered between
+  sessions. Auto keeps following the system, as before.
+- **Relay stats** on the completion card: answers, characters, and rough
+  tokens per participant plus totals.
+- **Copy final answer** and **Copy transcript (.md)** buttons with
+  truthful per-button status, alongside the existing downloads.
+- **Turn counter** ("turn 3/9") next to the round tag, and a warning on
+  the token counter when a prompt grows past roughly 24k tokens.
+- **Keyboard shortcuts:** Ctrl+Shift+C copies the current prompt; Esc
+  closes the add-chatbot menu. (Ctrl+Enter to save & advance is unchanged.)
+
+### Improved
+- Accessibility: the relay lane announces progress to screen readers,
+  stale-context warnings are live regions, reorder buttons are labelled,
+  and keyboard focus is visible on all controls.
+- Small screens: tighter padding, 16px inputs (prevents mobile zoom-on-
+  focus), and a narrower minimum station width in the lane.
+
+### Unchanged by design
+- One standalone HTML file, no external dependencies, no network access,
+  same Content-Security-Policy, no answer-capture heuristics.
+
 ## v1.8.4
 
 Maintenance release for project presentation and release provenance. No behavior changes from the current app state.
