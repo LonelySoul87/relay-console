@@ -64,6 +64,8 @@ Relay Console runs entirely in your browser. It loads no remote fonts, scripts, 
 
 Autosave uses your browser's local storage, so your session survives a refresh when you run the saved file. Inside a sandboxed preview that storage may be blocked, so the **Save file** button is always there for a hard backup.
 
+Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles and can override the app's light theme. If the theme toggle seems to do nothing, exempt this page in the extension.
+
 ## Features
 
 - **Quick-add chatbots.** Pick from a built-in list (Claude, ChatGPT, Gemini, Perplexity, Copilot, Grok, DeepSeek, Mistral, Meta AI, Qwen, Kimi, Poe) with the homepage prefilled, or add a custom one.
@@ -74,7 +76,11 @@ Autosave uses your browser's local storage, so your session survives a refresh w
 - **Presets.** Save a roster plus settings under a name and reload it in one click.
 - **Collision-proof framing.** Quoted answers are fenced with a per-session token so pasted text can't break the prompt structure.
 - **Response-format control.** Markdown, plain prose, or a verbatim code block (the reliable way to move a table between models).
-- **Light and dark themes** that follow your system.
+- **Synthesis runner and grid compare.** Choose at setup which chatbot
+  runs the final synthesis, and flip the transcript into a side-by-side
+  grid to compare Blind answers before merging them.
+- **Light and dark themes** that follow your system, with a header toggle
+  to force either and remember your choice.
 - **Markdown and JSON export/import**, plus first-run guidance for newcomers.
 
 ## How Relay Console compares
@@ -106,7 +112,7 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v1.8.4.html`). There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones.
+Each release is a self-contained file named by version (for example `relay-console-v1.9.0.html`). There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones.
 
 ## Support
 
