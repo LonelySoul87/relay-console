@@ -79,9 +79,8 @@ Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles an
 - **Synthesis runner and grid compare.** Choose at setup which chatbot
   runs the final synthesis, and flip the transcript into a side-by-side
   grid to compare Blind answers before merging them.
-- **Theme override.** Follows your system by default; a header toggle
-  forces dark or light and remembers your choice.
-- **Light and dark themes** that follow your system.
+- **Light and dark themes** that follow your system, with a header toggle
+  to force either and remember your choice.
 - **Markdown and JSON export/import**, plus first-run guidance for newcomers.
 
 ## How Relay Console compares
@@ -113,7 +112,7 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v1.8.4.html`). There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones.
+Each release is a self-contained file named by version (for example `relay-console-v1.9.0.html`). There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones.
 
 ## Support
 
