@@ -23,7 +23,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; child-src 'none'; media-src 'none'; manifest-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none';">
-<title>Relay Console v1.8.4</title>
+<title>Relay Console v1.9.0</title>
 <style>
   :root{
     color-scheme: light dark;
@@ -55,6 +55,31 @@
       --ok:#2f9d72; --danger:#c25555;
     }
   }
+  /* manual theme override (v1.9): wins over the system preference above */
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#100f15; --bg-2:#15131c; --panel:#1a1822; --panel-2:#221f2c; --line:#2f2b3a; --line-soft:#26222f;
+    --text:#ece9f3; --muted:#928aa6;
+    --signal:#f4a52e; --signal-2:#ffce7a; --accent-text:#f6b347; --btn-ink:#1c1303;
+    --prompt-bg:#0c0b11; --prompt-text:#cdc9da;
+    --entry-text:#d3cfe0; --code-text:#b6b0c6;
+    --focus-ring:rgba(244,165,46,.22); --node-glow:rgba(244,165,46,.45);
+    --card-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 10px 30px -18px rgba(0,0,0,.8);
+    --hero-glow:rgba(244,165,46,.13);
+    --ok:#54c79a; --danger:#e0716f;
+  }
+  :root[data-theme="light"]{
+    color-scheme: light;
+    --bg:#f3f1ec; --bg-2:#efece5; --panel:#ffffff; --panel-2:#f4f1ea; --line:#e4dfd4; --line-soft:#ece8df;
+    --text:#1b1822; --muted:#6c6678;
+    --signal:#f0a01f; --signal-2:#ffd98a; --accent-text:#9c5d06; --btn-ink:#2a1c02;
+    --prompt-bg:#faf8f2; --prompt-text:#2b3040;
+    --entry-text:#2a2f3a; --code-text:#5b6172;
+    --focus-ring:rgba(156,93,6,.2); --node-glow:rgba(240,160,31,.4);
+    --card-shadow:0 1px 2px rgba(28,24,18,.05), 0 14px 34px -22px rgba(28,24,18,.4);
+    --hero-glow:rgba(240,160,31,.16);
+    --ok:#2f9d72; --danger:#c25555;
+  }
   @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important;scroll-behavior:auto!important} }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -74,6 +99,7 @@
   .titlebar{display:flex;align-items:baseline;gap:13px;flex-wrap:wrap}
   h1{font-family:var(--display);font-weight:700;font-size:clamp(32px,6vw,44px);letter-spacing:-.03em;margin:0;line-height:.98}
   .ver{font-family:var(--mono);font-size:12px;color:var(--accent-text);border:1px solid var(--line);border-radius:999px;padding:3px 10px;transform:translateY(-4px)}
+  #themeBtn{margin-left:auto;transform:translateY(-4px)}
   .sub{color:var(--muted);font-size:14px;margin:12px 0 0;max-width:62ch}
   .sub b{color:var(--accent-text);font-weight:600}
 
@@ -96,6 +122,7 @@
   @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
   button{font-family:var(--body);font-weight:500;cursor:pointer;border-radius:10px;border:1px solid transparent;transition:.14s}
+  button:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
   .btn{background:linear-gradient(180deg,var(--signal-2),var(--signal));color:var(--btn-ink);padding:11px 18px;font-size:14.5px;font-weight:600;box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 6px 16px -8px var(--node-glow)}
   .btn:hover{filter:brightness(1.05);transform:translateY(-1px)}
   .btn:active{transform:translateY(0)}
@@ -148,16 +175,24 @@
   .station.done .nm{color:var(--text)}
   .now{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--accent-text);margin-top:3px}
 
+  /* question during the run (v1.9) */
+  .qcard{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:var(--r);padding:14px 18px;margin-bottom:16px;box-shadow:var(--card-shadow)}
+  .qcard summary{cursor:pointer;font-family:var(--mono);font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);list-style-position:inside}
+  .qcard summary:hover{color:var(--accent-text)}
+  .qtext{margin-top:10px;white-space:pre-wrap;font-size:14px;color:var(--entry-text)}
+
   /* turn / prompt */
-  .turnhead{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+  .turnhead{display:flex;align-items:center;gap:11px;margin-bottom:14px;flex-wrap:wrap}
   .turnhead .dot{width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 16%,transparent)}
   .turnhead .who{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:-.01em}
+  .roundtag{font-family:var(--mono);font-size:11px;color:var(--muted)}
   .roleline{font-size:12.5px;color:var(--muted);margin:-6px 0 12px}
   .stalewarn{font-size:12.5px;color:var(--danger);margin:-6px 0 12px}
   .copied{color:var(--ok);font-size:12.5px;font-weight:600}
   #promptBox{background:var(--prompt-bg);border:1px solid var(--line);border-radius:11px;font-family:var(--mono);font-size:13px;line-height:1.62;padding:15px;color:var(--prompt-text);width:100%;min-height:130px;max-height:340px;resize:vertical}
   #promptBox:focus{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px var(--focus-ring)}
   .counter{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:6px}
+  .counter.warn{color:var(--danger)}
   #launchBtn::after{content:" \2197";font-weight:700}
 
   /* transcript */
@@ -167,6 +202,9 @@
   .entry .eh .nm{font-weight:700;font-size:13.5px}
   .entry .eh .rd{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
   .entry .body{font-size:14px;white-space:pre-wrap;color:var(--entry-text)}
+  #transcript.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;align-items:start}
+  #transcript.grid .entry{border:1px solid var(--line);border-left:3px solid var(--line);border-radius:10px;padding:11px 13px;margin:0;background:var(--bg-2)}
+  #transcript.grid .entry .body{max-height:280px;overflow:auto}
   .badge{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);text-transform:uppercase}
   .badge.trim{color:var(--accent-text);border-color:var(--accent-text)}
   .badge.excl{color:var(--danger);border-color:var(--danger)}
@@ -182,11 +220,13 @@
   .seg button{background:var(--bg-2);color:var(--muted);border:none;padding:9px 15px;font-size:13.5px;transition:.14s}
   .seg button:hover{color:var(--text)}
   .seg button.on{background:linear-gradient(180deg,var(--panel),var(--panel-2));color:var(--accent-text);font-weight:600;box-shadow:0 0 0 1px var(--signal) inset}
+  .seg.segmini button{padding:5px 10px;font-size:12px}
   .check{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text);cursor:pointer;margin-top:14px}
   .check input{width:16px;height:16px;accent-color:var(--signal)}
   .hint{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.5}
   .footnote{color:var(--muted);font-size:12px;text-align:center;margin-top:34px;line-height:1.6}
   .footnote code{font-family:var(--mono);color:var(--code-text)}
+  .stats{font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.85;margin-bottom:14px;white-space:pre-wrap}
 
   /* v1.5 additions */
   .storagewarn{background:color-mix(in srgb,var(--danger) 12%,var(--panel));border:1px solid var(--danger);border-radius:12px;padding:12px 15px;margin-bottom:16px;font-size:13px;color:var(--text)}
@@ -208,13 +248,24 @@
   .callout{border:1px solid var(--danger);border-radius:10px;padding:10px 12px;margin:0 0 10px;background:color-mix(in srgb,var(--danger) 10%,var(--panel))}
   .callout .msg{display:block;color:var(--danger);font-size:12.5px;line-height:1.45;margin-bottom:8px}
   .callout .calloutBtns{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* small screens (v1.9) */
+  @media (max-width:560px){
+    body{padding:20px 12px 70px}
+    .card{padding:16px 14px}
+    textarea,input[type=text],input[type=url],input[type=number],select{font-size:16px}
+    .station{min-width:64px}
+    .turnhead .who{font-size:18px}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="masthead">
     <div class="eyebrow">multi-model relay</div>
-    <div class="titlebar"><h1>Relay Console</h1><span class="ver">v1.8.4</span></div>
+    <div class="titlebar"><h1>Relay Console</h1><span class="ver">v1.9.0</span>
+      <button class="tiny" id="themeBtn" title="Cycle color theme (auto / dark / light)" aria-label="Cycle color theme">theme: auto</button>
+    </div>
     <p class="sub">Pass one question around your chatbots by hand. You stay the wire: <b>copy out, paste in</b>. Role-aware prompts, a curated record of what each model said, and control over what carries forward.</p>
   </header>
 
@@ -237,7 +288,7 @@
 
     <div class="card">
       <div class="spread"><h2 style="margin:0">Participants</h2>
-        <button class="tiny" id="addP">+ add chatbot</button></div>
+        <button class="tiny" id="addP" aria-expanded="false">+ add chatbot</button></div>
       <div id="plist" style="margin-top:12px"></div>
       <div id="addMenu" class="addmenu hidden"></div>
       <p class="hint">Order is the relay order. The URL powers the one-click launch each turn. Each slot starts with its recommended role preselected in the dropdown; pick a different suggestion, choose (no role), or type your own, and it gets woven into that model's prompt. Your roster is remembered between sessions.</p>
@@ -260,6 +311,11 @@
         </div>
       </div>
       <label class="check" id="closingWrap"><input type="checkbox" id="closing"> End with a synthesis turn (one model merges the whole debate)</label>
+      <div id="synthWrap" class="hidden" style="margin-top:14px">
+        <label>Synthesis runner (the chatbot whose tab opens for the final merge)</label>
+        <select id="synthPick"></select>
+        <p class="hint">Optional. Leave it open and you can still paste the synthesis prompt anywhere when you get there.</p>
+      </div>
       <div style="margin-top:18px">
         <label>Response format (woven into every prompt, so the models answer consistently)</label>
         <select id="format">
@@ -291,8 +347,13 @@
 
   <!-- RUN -->
   <div id="run" class="hidden">
+    <details class="qcard" id="qcard">
+      <summary>The question</summary>
+      <div class="qtext" id="runQuestion"></div>
+    </details>
+
     <div class="card" style="padding-bottom:14px">
-      <div class="lanewrap"><div class="lane" id="lane"></div></div>
+      <div class="lanewrap"><div class="lane" id="lane" role="img"></div></div>
     </div>
 
     <div class="card" id="turnCard">
@@ -303,8 +364,8 @@
         <button class="tiny" id="helpBtn" title="Show the steps">tips</button>
       </div>
       <p class="roleline hidden" id="roleLine"></p>
-      <p class="stalewarn hidden" id="staleWarn"></p>
-      <p class="stalewarn hidden" id="reviewWarn"></p>
+      <p class="stalewarn hidden" id="staleWarn" role="status" aria-live="polite"></p>
+      <p class="stalewarn hidden" id="reviewWarn" role="status" aria-live="polite"></p>
       <div id="coach" class="coach hidden"></div>
 
       <div class="spread" style="margin-bottom:8px">
@@ -315,14 +376,14 @@
           <button class="tiny" id="regenBtn">Regenerate</button>
         </div>
       </div>
-      <div class="callout hidden" id="promptStaleWarn">
+      <div class="callout hidden" id="promptStaleWarn" role="status" aria-live="polite">
         <span class="msg" id="promptStaleMsg"></span>
         <div class="calloutBtns">
           <button class="tiny" id="promptRegen">Regenerate prompt</button>
           <button class="tiny" id="promptKeep">Keep edited prompt</button>
         </div>
       </div>
-      <textarea id="promptBox" spellcheck="false"></textarea>
+      <textarea id="promptBox" spellcheck="false" aria-label="Prompt for the current chatbot"></textarea>
       <div class="counter" id="counter"></div>
 
       <div class="row" style="margin-top:12px">
@@ -347,9 +408,11 @@
 
     <div class="card hidden" id="doneCard">
       <h2>Relay complete</h2>
-      <p class="hint" id="doneMsg" style="margin-bottom:16px"></p>
+      <p class="hint" id="doneMsg" style="margin-bottom:12px"></p>
+      <div class="stats hidden" id="doneStats"></div>
       <div class="row">
         <button class="btn" id="exportMd">Download transcript (.md)</button>
+        <button class="ghost" id="copyFinal">Copy final answer</button>
         <button class="ghost" id="reopen">Reopen last turn</button>
         <button class="ghost" id="restart">New relay</button>
       </div>
@@ -358,24 +421,30 @@
     <div class="card">
       <div class="spread"><h2 style="margin:0">Transcript</h2>
         <div class="row">
+          <div class="seg segmini" id="viewSeg" role="group" aria-label="Transcript layout">
+            <button data-view="list" class="on">List</button>
+            <button data-view="grid">Grid</button>
+          </div>
+          <button class="tiny" id="copyMdBtn">Copy .md</button>
           <button class="tiny" id="saveSession">Save file</button>
           <button class="tiny" id="exportMd2">Export .md</button>
         </div>
       </div>
-      <p class="hint" style="margin-top:2px">The text here is the answer you captured. Trimming what's sent forward never alters this copy or the exports; it only changes what later models receive. Re-pasting a turn overwrites its captured text.</p>
+      <p class="hint" style="margin-top:2px">The text here is the answer you captured. Trimming what's sent forward never alters this copy or the exports; it only changes what later models receive. Re-pasting a turn overwrites its captured text. Grid view lays answers side by side, which is the honest way to compare a Blind round.</p>
       <div id="transcript" style="margin-top:14px"></div>
     </div>
   </div>
 
   <p class="footnote">
     Relay Console v<span id="footVer"></span> runs in your browser and never uploads your questions, answers, or session data. It opens a provider website only when you explicitly choose Copy &amp; open. Anything you paste into that provider is handled under its own terms.<br>
-    Autosave keeps your session when you run this as a saved <code>.html</code> file. Inside a preview it may not persist, so use <code>Save file</code> for a hard backup.
+    Autosave keeps your session when you run this as a saved <code>.html</code> file. Inside a preview it may not persist, so use <code>Save file</code> for a hard backup.<br>
+    Shortcuts: <code>Ctrl+Enter</code> saves &amp; advances · <code>Ctrl+Shift+C</code> copies the current prompt · <code>Esc</code> closes the add-chatbot menu.
   </p>
 </div>
 
 <script>
 /* SPDX-License-Identifier: GPL-3.0-only  |  Copyright (C) 2026 LonelySoul87 Projects  |  GPLv3 or commercial license */
-const VERSION="1.8.4";
+const VERSION="1.9.0";
 const PALETTE=["#d97757","#10a37f","#4f8cf7","#7c6cf0","#f2a541","#e06b9c","#5bc0c0","#b58cf0"];
 const DEFAULTS=[
   {name:"Claude",     color:"#d97757", url:"https://claude.ai",         role:""},
@@ -422,6 +491,7 @@ const Store={
   clearDraft(){try{localStorage.removeItem(this.dk);}catch(e){}}
 };
 function saveState(){ if(!state) return false; const ok=Store.save(state); $("storageWarn").classList.toggle("hidden", ok===true); return ok; }
+function savePref(k,v){ const p=Store.loadPrefs()||{}; p[k]=v; Store.savePrefs(p); }
 
 /* ---------- helpers ---------- */
 function safeColor(c){return HEX.test(c||"")?c:PALETTE[0];}
@@ -446,6 +516,17 @@ const FORMATS={
 };
 let fmt="markdown";
 function formatDirective(){ const f=(state?state.format:fmt); return (FORMATS[f]||FORMATS.markdown).directive; }
+
+/* ---------- theme (v1.9): auto follows the system, dark/light override ---------- */
+const THEMES=["auto","dark","light"];
+let theme="auto";
+function applyTheme(t){
+  theme=THEMES.includes(t)?t:"auto";
+  if(theme==="auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme",theme);
+  $("themeBtn").textContent="theme: "+theme;
+}
+$("themeBtn").onclick=()=>{ applyTheme(THEMES[(THEMES.indexOf(theme)+1)%THEMES.length]); savePref("theme",theme); };
 
 /* ---------- role suggestions, tailored to a participant's slot in the order ---------- */
 const ROLE_POOL={
@@ -476,37 +557,49 @@ const openEditors=new Set(); // transcript entries with the curate editor open
 
 function persistRoster(){ Store.saveRoster(parts.map(p=>({name:p.name,color:p.color,url:p.url,role:p.role,roleSet:!!p.roleSet}))); }
 
+/* the synthesis-runner picker mirrors the roster (v1.9) */
+function refreshSynthPick(){
+  const wrap=$("synthWrap"), sel=$("synthPick"); if(!wrap||!sel) return;
+  const show=(mode==="blind")||(mode==="debate"&&$("closing").checked);
+  wrap.classList.toggle("hidden",!show);
+  const keep=sel.value;
+  sel.innerHTML="";
+  const none=document.createElement("option"); none.value=""; none.textContent="(decide when you get there)"; sel.appendChild(none);
+  parts.forEach((p,i)=>{ const o=document.createElement("option"); o.value=String(i); o.textContent=p.name||("Model "+(i+1)); sel.appendChild(o); });
+  if(keep!=="" && +keep<parts.length) sel.value=keep;
+}
+
 function renderParts(){
   const list=$("plist"); list.innerHTML="";
   parts.forEach((p,i)=>{
     const card=document.createElement("div"); card.className="pcard";
     const top=document.createElement("div"); top.className="top";
     const dot=document.createElement("span"); dot.className="dot"; dot.style.background=safeColor(p.color);
-    const nm=document.createElement("input"); nm.type="text"; nm.className="pname"; nm.value=p.name; nm.placeholder="Name";
-    nm.oninput=()=>{parts[i].name=nm.value; persistRoster();};
-    const sw=document.createElement("input"); sw.type="color"; sw.className="swatch"; sw.value=safeColor(p.color);
+    const nm=document.createElement("input"); nm.type="text"; nm.className="pname"; nm.value=p.name; nm.placeholder="Name"; nm.setAttribute("aria-label","Chatbot name");
+    nm.oninput=()=>{parts[i].name=nm.value; persistRoster(); refreshSynthPick();};
+    const sw=document.createElement("input"); sw.type="color"; sw.className="swatch"; sw.value=safeColor(p.color); sw.title="Marker color"; sw.setAttribute("aria-label","Marker color");
     sw.oninput=()=>{parts[i].color=sw.value; dot.style.background=sw.value; persistRoster();};
     const ord=document.createElement("div"); ord.className="ord";
-    const up=document.createElement("button"); up.type="button"; up.textContent="\u2191"; up.title="Move up"; up.disabled=(i===0);
+    const up=document.createElement("button"); up.type="button"; up.textContent="↑"; up.title="Move up"; up.setAttribute("aria-label","Move "+(p.name||"model")+" up"); up.disabled=(i===0);
     up.onclick=()=>{ if(i===0)return; [parts[i-1],parts[i]]=[parts[i],parts[i-1]]; persistRoster(); renderParts(); };
-    const down=document.createElement("button"); down.type="button"; down.textContent="\u2193"; down.title="Move down"; down.disabled=(i===parts.length-1);
+    const down=document.createElement("button"); down.type="button"; down.textContent="↓"; down.title="Move down"; down.setAttribute("aria-label","Move "+(p.name||"model")+" down"); down.disabled=(i===parts.length-1);
     down.onclick=()=>{ if(i===parts.length-1)return; [parts[i+1],parts[i]]=[parts[i],parts[i+1]]; persistRoster(); renderParts(); };
     ord.append(up,down);
     const del=document.createElement("button"); del.className="tiny"; del.textContent="remove";
     del.onclick=()=>{ if(parts.length<=2){alert("Keep at least two participants.");return;} parts.splice(i,1); persistRoster(); renderParts(); };
     top.append(dot,nm,ord,sw,del);
     const fields=document.createElement("div"); fields.className="fields";
-    const url=document.createElement("input"); url.type="url"; url.className="url"; url.value=p.url||""; url.placeholder="https://...";
+    const url=document.createElement("input"); url.type="url"; url.className="url"; url.value=p.url||""; url.placeholder="https://..."; url.setAttribute("aria-label","Chatbot homepage URL");
     url.oninput=()=>{parts[i].url=url.value; persistRoster();};
     const sug=roleSuggestions(i,parts.length,mode);
     const rec=sug[0]||"";
     if(!p.roleSet){ p.role=rec; }   // soft default: the slot's recommended role, until the user picks
     const role=document.createElement("input"); role.type="text"; role.className="role"; role.value=p.role||"";
-    role.placeholder="optional role";
+    role.placeholder="optional role"; role.setAttribute("aria-label","Role for this chatbot");
     role.oninput=()=>{ parts[i].role=role.value; parts[i].roleSet=true; persistRoster(); };
     fields.append(url,role);
     // visible dropdown; the recommended role is the default selection, with a no-role escape
-    const sel=document.createElement("select"); sel.className="rolesug";
+    const sel=document.createElement("select"); sel.className="rolesug"; sel.setAttribute("aria-label","Role suggestions");
     const none=document.createElement("option"); none.value="__none__"; none.textContent="(no role)"; sel.appendChild(none);
     const opts=sug.slice(0,8);
     if(p.roleSet && p.role && p.role.trim() && !opts.includes(p.role)){ const cu=document.createElement("option"); cu.value=p.role; cu.textContent=p.role+" (custom)"; sel.appendChild(cu); }
@@ -515,6 +608,7 @@ function renderParts(){
     sel.onchange=()=>{ parts[i].roleSet=true; parts[i].role=(sel.value==="__none__")?"":sel.value; role.value=parts[i].role; persistRoster(); };
     card.append(top,fields,sel); list.appendChild(card);
   });
+  refreshSynthPick();
 }
 function addParticipant(o){ parts.push({name:cleanName(o.name)||("Model "+(parts.length+1)),color:safeColor(o.color)||PALETTE[parts.length%PALETTE.length],url:o.url||"",role:"",roleSet:false,id:newPid()}); persistRoster(); renderParts(); }
 function renderAddMenu(){
@@ -524,14 +618,15 @@ function renderAddMenu(){
     const d=document.createElement("span"); d.className="pd"; d.style.background=pv.color;
     const nm=document.createElement("span"); nm.textContent=pv.name;
     b.append(d,nm);
-    b.onclick=()=>{ addParticipant(pv); m.classList.add("hidden"); };
+    b.onclick=()=>{ addParticipant(pv); closeAddMenu(); };
     m.appendChild(b);
   });
   const c=document.createElement("button"); c.className="custom"; c.textContent="+ Custom (blank)";
-  c.onclick=()=>{ addParticipant({name:"Model "+(parts.length+1),color:PALETTE[parts.length%PALETTE.length],url:""}); m.classList.add("hidden"); };
+  c.onclick=()=>{ addParticipant({name:"Model "+(parts.length+1),color:PALETTE[parts.length%PALETTE.length],url:""}); closeAddMenu(); };
   m.appendChild(c);
 }
-$("addP").onclick=()=>{ const m=$("addMenu"); if(m.classList.contains("hidden")){ renderAddMenu(); m.classList.remove("hidden"); } else { m.classList.add("hidden"); } };
+function closeAddMenu(){ $("addMenu").classList.add("hidden"); $("addP").setAttribute("aria-expanded","false"); }
+$("addP").onclick=()=>{ const m=$("addMenu"); if(m.classList.contains("hidden")){ renderAddMenu(); m.classList.remove("hidden"); $("addP").setAttribute("aria-expanded","true"); } else closeAddMenu(); };
 
 const MODE_HINTS={
   debate:"Each model sees the conversation so far and is told who just spoke and to engage with it. A real back-and-forth.",
@@ -542,8 +637,10 @@ function setMode(m){
   $("modeSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.mode===m));
   $("closingWrap").style.opacity=m==="blind"?.45:1; $("closing").disabled=m==="blind";
   if($("plist")) renderParts();   // refresh slot-aware role suggestions for the new mode
+  refreshSynthPick();
 }
 $("modeSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$("closing").addEventListener("change",refreshSynthPick);
 
 function setFormat(f){ fmt=(FORMATS[f]?f:"markdown"); $("format").value=fmt; $("formatHint").textContent=FORMATS[fmt].hint; }
 $("format").addEventListener("change",()=>setFormat($("format").value));
@@ -623,6 +720,11 @@ function markDownstreamStale(i){
 function applyForward(i,newF){ const before=effFwd(state.answers[i],state.forward[i]); state.forward[i]=newF; const after=effFwd(state.answers[i],state.forward[i]); if(before!==after) markDownstreamStale(i); }
 
 /* ---------- render ---------- */
+function turnTarget(t){
+  // which participant's tab should open for this turn (v1.9: the synthesis runner is configurable)
+  if(t.kind==="synth") return state.synthPid?state.participants.find(x=>x.id===state.synthPid)||null:null;
+  return state.participants.find(x=>x.id===t.pid)||null;
+}
 function renderLane(){
   const lane=$("lane"); lane.innerHTML="";
   state.turns.forEach((t,i)=>{
@@ -644,9 +746,11 @@ function renderLane(){
     const node=document.createElement("div"); node.className="node"+(done?" done":"")+(active?" active":"");
     st.appendChild(node);
     const nm=document.createElement("div"); nm.className="nm"; nm.textContent=t.name; st.appendChild(nm);
-    if(active){ const now=document.createElement("span"); now.className="now"; now.textContent="\u25B8 NOW"; st.appendChild(now); }
+    if(active){ const now=document.createElement("span"); now.className="now"; now.textContent="▸ NOW"; st.appendChild(now); }
     lane.appendChild(st);
   });
+  const cur=Math.min(state.cursor+1,state.turns.length);
+  lane.setAttribute("aria-label",`Relay progress: turn ${cur} of ${state.turns.length}${state.cursor<state.turns.length?", now "+state.turns[state.cursor].name:""}`);
   const active=lane.querySelector(".station.active");
   if(active && lane.scrollTo){ const target=active.offsetLeft-(lane.clientWidth/2)+(active.offsetWidth/2); lane.scrollTo({left:Math.max(0,target),behavior:"smooth"}); }
 }
@@ -669,8 +773,8 @@ function renderTranscript(){
     const rd=document.createElement("span"); rd.className="rd"; rd.textContent=t.kind==="synth"?"synthesis":`round ${t.round}`;
     eh.append(nm,rd);
     if(t.kind!=="synth"){ const bg=contextBadge(i); const b=document.createElement("span"); b.className="badge"+(bg.c?" "+bg.c:""); b.textContent=bg.t; eh.append(b); }
-    if(state.stale[i]){ const s=document.createElement("span"); s.className="staletag"; s.textContent="\u26a0 an earlier turn was edited after this"; eh.append(s); }
-    if(state.review&&state.review[i]){ const rv=document.createElement("span"); rv.className="reviewtag"; rv.textContent="\u26a0 original changed, re-check what's forwarded"; eh.append(rv); }
+    if(state.stale[i]){ const s=document.createElement("span"); s.className="staletag"; s.textContent="⚠ an earlier turn was edited after this"; eh.append(s); }
+    if(state.review&&state.review[i]){ const rv=document.createElement("span"); rv.className="reviewtag"; rv.textContent="⚠ original changed, re-check what's forwarded"; eh.append(rv); }
     const body=document.createElement("div"); body.className="body"; body.textContent=a;
     d.append(eh,body);
 
@@ -704,7 +808,25 @@ function afterChange(){ renderTranscript(); if(!($("turnCard").classList.contain
 
 function updateCounter(){
   const txt=$("promptBox").value, chars=txt.length, tokens=Math.ceil(chars/4);
-  $("counter").textContent=`${chars.toLocaleString()} chars · ~${tokens.toLocaleString()} tokens (rough). Longer transcripts cost more each turn.`;
+  const warn=tokens>24000;
+  $("counter").textContent=`${chars.toLocaleString()} chars · ~${tokens.toLocaleString()} tokens (rough). Longer transcripts cost more each turn.`+(warn?" ⚠ This is getting long; consider trimming earlier answers in the transcript.":"");
+  $("counter").classList.toggle("warn",warn);
+}
+function doneStatsText(){
+  const per=new Map();
+  let total=0;
+  state.turns.forEach((t,i)=>{
+    const a=(state.answers[i]||"").trim(); if(!a) return;
+    total+=a.length;
+    const key=t.kind==="synth"?"Synthesis":t.name;
+    const cur=per.get(key)||{n:0,chars:0};
+    cur.n++; cur.chars+=a.length; per.set(key,cur);
+  });
+  if(!per.size) return "";
+  const lines=[];
+  per.forEach((v,k)=>lines.push(`${k}: ${v.n} answer${v.n===1?"":"s"} · ${v.chars.toLocaleString()} chars · ~${Math.ceil(v.chars/4).toLocaleString()} tokens`));
+  lines.push(`Total captured: ${total.toLocaleString()} chars · ~${Math.ceil(total/4).toLocaleString()} tokens`);
+  return lines.join("\n");
 }
 function renderTurn(){
   const done=state.ended||state.cursor>=state.turns.length;
@@ -715,27 +837,29 @@ function renderTurn(){
     const n=state.answers.filter(a=>(a||"").trim()).length;
     const hasSynth=state.turns.some((t,i)=>t.kind==="synth"&&(state.answers[i]||"").trim());
     $("doneMsg").textContent=n===0?"No answers recorded yet. Reopen a turn or start fresh.":hasSynth?`${n-1} answer${n-1===1?"":"s"} plus a synthesis captured. Download it or keep going.`:`${n} answer${n===1?"":"s"} captured. Download the transcript or keep going.`;
+    const st=doneStatsText();
+    $("doneStats").textContent=st; $("doneStats").classList.toggle("hidden",!st);
     saveState(); return;
   }
   const t=state.turns[state.cursor];
   $("turnDot").style.background=safeColor(t.color);
   $("turnWho").textContent=t.name;
-  $("turnRound").textContent=t.kind==="synth"?"final synthesis":t.kind==="blind"?"independent answer":`round ${t.round} of ${state.rounds}`;
+  $("turnRound").textContent=(t.kind==="synth"?"final synthesis":t.kind==="blind"?"independent answer":`round ${t.round} of ${state.rounds}`)+` · turn ${state.cursor+1}/${state.turns.length}`;
   if(t.role&&t.role.trim()&&t.kind!=="synth"){ $("roleLine").textContent=`Role woven into this prompt: ${t.role.trim()}`; $("roleLine").classList.remove("hidden"); } else $("roleLine").classList.add("hidden");
-  if(state.stale[state.cursor]){ $("staleWarn").textContent="\u26a0 This saved answer may be outdated because an earlier turn changed. Re-paste this answer to refresh it against the new context."; $("staleWarn").classList.remove("hidden"); } else $("staleWarn").classList.add("hidden");
-  const p=state.participants.find(x=>x.id===t.pid);
+  if(state.stale[state.cursor]){ $("staleWarn").textContent="⚠ This saved answer may be outdated because an earlier turn changed. Re-paste this answer to refresh it against the new context."; $("staleWarn").classList.remove("hidden"); } else $("staleWarn").classList.add("hidden");
+  const p=turnTarget(t);
   const canOpen=p&&p.url&&/^https?:\/\//i.test(p.url);
-  $("targetName").textContent=t.kind==="synth"?"whichever model you trust to merge it":t.name;
-  $("launchBtn").textContent=(t.kind!=="synth"&&canOpen)?`Copy & open ${t.name}`:"Copy prompt";
+  $("targetName").textContent=t.kind==="synth"?(p?`${p.name} (your synthesis runner)`:"whichever model you trust to merge it"):t.name;
+  $("launchBtn").textContent=canOpen?`Copy & open ${p.name}`:"Copy prompt";
   const ov=state.prompts?state.prompts[state.cursor]:null;
   $("promptBox").value=(ov!=null)?ov:buildPrompt(state.cursor);
   $("editedTag").classList.toggle("hidden",ov==null);
   const pStale=!!(state.promptStale && state.promptStale[state.cursor] && ov!=null);
-  if(pStale){ $("promptStaleMsg").textContent="\u26a0 This edited prompt may contain stale context because an earlier answer or forwarded context changed."; $("promptStaleWarn").classList.remove("hidden"); } else $("promptStaleWarn").classList.add("hidden");
+  if(pStale){ $("promptStaleMsg").textContent="⚠ This edited prompt may contain stale context because an earlier answer or forwarded context changed."; $("promptStaleWarn").classList.remove("hidden"); } else $("promptStaleWarn").classList.add("hidden");
   $("regenBtn").classList.toggle("hidden", pStale);   // callout owns the prompt-resolution actions while it is shown
   const draft=state.draftAnswers?state.draftAnswers[state.cursor]:null;
   $("answer").value=(draft!=null)?draft:(state.answers[state.cursor]||"");
-  if(state.review&&state.review[state.cursor]){ $("reviewWarn").textContent="\u26a0 You trimmed what this turn sends forward, then the original changed. The trimmed version is still being sent. Open \"Edit what's sent forward\" in the transcript to reconfirm."; $("reviewWarn").classList.remove("hidden"); } else $("reviewWarn").classList.add("hidden");
+  if(state.review&&state.review[state.cursor]){ $("reviewWarn").textContent="⚠ You trimmed what this turn sends forward, then the original changed. The trimmed version is still being sent. Open \"Edit what's sent forward\" in the transcript to reconfirm."; $("reviewWarn").classList.remove("hidden"); } else $("reviewWarn").classList.add("hidden");
   copiedThisTurn=false;
   copySeq++;                       // a pending copy from a prior turn can no longer update the UI
   $("copiedMsg").classList.add("hidden");
@@ -746,16 +870,18 @@ function renderTurn(){
 }
 
 /* ---------- start / nav ---------- */
-function beginState(s){ state=s; $("setup").classList.add("hidden"); $("run").classList.remove("hidden"); $("resumeBar").classList.add("hidden"); openEditors.clear(); renderTurn(); }
+function beginState(s){ state=s; $("runQuestion").textContent=state.question; $("setup").classList.add("hidden"); $("run").classList.remove("hidden"); $("resumeBar").classList.add("hidden"); openEditors.clear(); renderTurn(); }
 $("start").onclick=()=>{
   const q=$("question").value.trim(); if(!q){alert("Write a question first.");return;}
   const rounds=Math.max(1,Math.min(6,+$("rounds").value||1));
   const participants=parts.map((p,i)=>({id:p.id,name:cleanName(p.name)||("Model "+(i+1)),color:safeColor(p.color),url:(p.url||"").trim(),role:(p.role||"").trim()}));
   const closing=mode==="blind"?false:$("closing").checked;
-  Store.savePrefs({mode,rounds,closing,format:fmt});
+  Store.savePrefs(Object.assign(Store.loadPrefs()||{},{mode,rounds,closing,format:fmt}));
   Store.clearDraft();
   const turns=buildTurns(participants,rounds,mode,closing);
-  beginState({version:VERSION,question:q,mode,rounds,closing,format:fmt,nonce:freshNonce(),participants,turns,
+  const spv=$("synthPick").value;
+  const synthPid=(spv!==""&&participants[+spv])?participants[+spv].id:null;
+  beginState({version:VERSION,question:q,mode,rounds,closing,format:fmt,nonce:freshNonce(),participants,turns,synthPid,
     answers:new Array(turns.length).fill(""),forward:new Array(turns.length).fill(null),stale:new Array(turns.length).fill(false),prompts:new Array(turns.length).fill(null),promptStale:new Array(turns.length).fill(false),draftAnswers:new Array(turns.length).fill(null),review:new Array(turns.length).fill(false),
     cursor:0,ended:false,ts:Date.now()});
 };
@@ -778,7 +904,7 @@ function syncCopy(text){
 function showCopyStatus(kind, seq){
   if(seq!==copySeq) return;            // a newer copy attempt has superseded this one
   const m=$("copiedMsg"); m.classList.remove("hidden","fail");
-  if(kind==="copying"){ m.textContent="Copying\u2026"; }
+  if(kind==="copying"){ m.textContent="Copying…"; }
   else if(kind==="failed"){ m.textContent="Copy failed, select the prompt and copy it manually."; m.classList.add("fail"); }
   else { m.textContent="Copied"; setTimeout(()=>{ if(seq===copySeq && m.textContent==="Copied") m.classList.add("hidden"); },1400); }
 }
@@ -798,11 +924,19 @@ function attemptCopy(text){
     );
   } else { showCopyStatus("failed",seq); markCopied(false,seq); }
 }
+/* small self-labelling copy for buttons outside the turn card (v1.9) */
+let miniSeq=0;
+function miniCopy(btn,text,idle){
+  const ok=syncCopy(text); const my=++miniSeq;
+  btn.textContent=ok?"Copied ✓":"Copy failed";
+  setTimeout(()=>{ if(my===miniSeq) btn.textContent=idle; },1400);
+  return ok;
+}
 $("copyOnly").onclick=()=>{ attemptCopy($("promptBox").value); };
 $("launchBtn").onclick=()=>{
   const text=$("promptBox").value;
   const t=state.turns[state.cursor];
-  const p=state.participants.find(x=>x.id===t.pid);
+  const p=turnTarget(t);
   const url=(p&&p.url&&/^https?:\/\//i.test(p.url))?p.url:null;
   attemptCopy(text);                       // sync first (keeps the gesture); async fallback updates status truthfully
   if(url) window.open(url,"_blank","noopener");
@@ -841,6 +975,16 @@ $("endEarly").onclick=()=>{ if(!confirm("Stop here and keep what you've got? You
 $("reopen").onclick=()=>{ state.ended=false; if(state.cursor>=state.turns.length) state.cursor=state.turns.length-1; renderTurn(); };
 $("restart").onclick=()=>{ if(!confirm("Start a new relay? This clears the current session. Your participant roster is kept."))return; Store.clear(); state=null; openEditors.clear(); $("storageWarn").classList.add("hidden"); $("run").classList.add("hidden"); $("setup").classList.remove("hidden"); };
 
+/* ---------- keyboard shortcuts (v1.9) ---------- */
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ closeAddMenu(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==="C"||e.key==="c")){
+    if(state && !state.ended && state.cursor<state.turns.length && !$("run").classList.contains("hidden")){
+      e.preventDefault(); attemptCopy($("promptBox").value);
+    }
+  }
+});
+
 /* ---------- export / file ---------- */
 function transcriptMd(){
   let md=`# Relay transcript\n\n**Question:** ${state.question}\n\n*Relay Console v${state.version||VERSION} · mode: ${state.mode} · ${state.participants.map(p=>p.name).join(", ")}*\n\n---\n\n`;
@@ -852,9 +996,20 @@ function transcriptMd(){
   });
   return md;
 }
+function finalAnswerText(){
+  for(let i=state.turns.length-1;i>=0;i--){
+    if(state.turns[i].kind==="synth"&&(state.answers[i]||"").trim()) return state.answers[i].trim();
+  }
+  for(let i=state.turns.length-1;i>=0;i--){
+    if((state.answers[i]||"").trim()) return state.answers[i].trim();
+  }
+  return "";
+}
 function download(name,content,type){ const b=new Blob([content],{type}); const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),500); }
 $("exportMd").onclick=$("exportMd2").onclick=()=>download(`relay-transcript-v${VERSION}.md`,transcriptMd(),"text/markdown");
 $("saveSession").onclick=()=>download(`relay-session-v${VERSION}.json`,JSON.stringify(state,null,2),"application/json");
+$("copyMdBtn").onclick=()=>{ if(state) miniCopy($("copyMdBtn"),transcriptMd(),"Copy .md"); };
+$("copyFinal").onclick=()=>{ if(!state) return; const t=finalAnswerText(); if(!t){ alert("No answers captured yet."); return; } miniCopy($("copyFinal"),t,"Copy final answer"); };
 $("importBtn").onclick=()=>$("importFile").click();
 $("importFile").onchange=e=>{
   const f=e.target.files[0]; if(!f){return;}
@@ -888,9 +1043,10 @@ function validateSession(s){
   const promptStale=turns.map((_,i)=> Array.isArray(s.promptStale)?!!s.promptStale[i]:false);
   const draftAnswers=turns.map((_,i)=> (Array.isArray(s.draftAnswers)&&s.draftAnswers[i]!=null)?cleanText(s.draftAnswers[i]):null);
   const review=turns.map((_,i)=> Array.isArray(s.review)?!!s.review[i]:false);
+  const synthPid=(typeof s.synthPid==="string"&&pidset.has(s.synthPid))?s.synthPid:null;   // v1.9 optional field; older files simply have none
   let cursor=Number.isInteger(s.cursor)?Math.max(0,Math.min(s.cursor,turns.length)):0;
   return {version:s.version||VERSION, question:cleanText(s.question), mode:["debate","blind"].includes(s.mode)?s.mode:"debate",
-    rounds:Math.max(1,Math.min(6,+s.rounds||1)), closing:!!s.closing, format:FORMATS[s.format]?s.format:"markdown", nonce:(typeof s.nonce==="string"&&/^[A-Za-z0-9]{4,40}$/.test(s.nonce))?s.nonce:freshNonce(), participants, turns, answers, forward, stale, prompts, promptStale, draftAnswers, review, cursor, ended:!!s.ended, ts:s.ts||Date.now()};
+    rounds:Math.max(1,Math.min(6,+s.rounds||1)), closing:!!s.closing, format:FORMATS[s.format]?s.format:"markdown", nonce:(typeof s.nonce==="string"&&/^[A-Za-z0-9]{4,40}$/.test(s.nonce))?s.nonce:freshNonce(), participants, turns, synthPid, answers, forward, stale, prompts, promptStale, draftAnswers, review, cursor, ended:!!s.ended, ts:s.ts||Date.now()};
 }
 
 
@@ -904,11 +1060,20 @@ function renderCoach(){
   box.classList.remove("hidden"); box.innerHTML="";
   const h=document.createElement("div"); h.className="coach-h"; h.textContent="New here? Each turn is three steps:"; box.appendChild(h);
   [["Copy the prompt and open the chatbot",s1],["Paste its reply in the box below",s2],["Save & advance to the next model",false]].forEach((st,n)=>{
-    const r=document.createElement("div"); r.className="coach-step"+(st[1]?" done":""); r.textContent=(st[1]?"\u2713 ":(n+1)+". ")+st[0]; box.appendChild(r);
+    const r=document.createElement("div"); r.className="coach-step"+(st[1]?" done":""); r.textContent=(st[1]?"✓ ":(n+1)+". ")+st[0]; box.appendChild(r);
   });
   const skip=document.createElement("button"); skip.className="linkbtn"; skip.textContent="Hide these tips"; skip.onclick=()=>{ Store.setFlag("coachSeen",true); coachForce=false; renderCoach(); }; box.appendChild(skip);
 }
 $("helpBtn").onclick=()=>{ coachForce=true; renderCoach(); };
+
+/* ---------- transcript view (v1.9) ---------- */
+let view="list";
+function setView(v){
+  view=(v==="grid")?"grid":"list";
+  $("transcript").classList.toggle("grid",view==="grid");
+  $("viewSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.view===view));
+}
+$("viewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{ setView(b.dataset.view); savePref("view",view); });
 
 /* ---------- presets ---------- */
 function renderPresets(sel){
@@ -937,6 +1102,7 @@ $("presetLoad").onclick=()=>{
   $("rounds").value=Math.max(1,Math.min(6,+p.rounds||2));
   if(!$("closing").disabled) $("closing").checked=!!p.closing;
   setFormat(FORMATS[p.format]?p.format:"markdown");
+  refreshSynthPick();
 };
 $("presetDel").onclick=()=>{
   const list=Store.loadPresets(); const i=+$("presetSelect").value;
@@ -959,6 +1125,9 @@ renderParts(); setMode("debate"); setFormat("markdown"); renderPresets();
   if(Number.isFinite(+p.rounds)) $("rounds").value=Math.max(1,Math.min(6,+p.rounds));
   if(typeof p.closing==="boolean" && !$("closing").disabled) $("closing").checked=p.closing;
   if(FORMATS[p.format]) setFormat(p.format);
+  if(THEMES.includes(p.theme)) applyTheme(p.theme);
+  if(p.view==="grid") setView("grid");
+  refreshSynthPick();
 })();
 (function offerResume(){
   if(!Store.ok) return;
