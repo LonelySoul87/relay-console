@@ -1,5 +1,38 @@
 # Changelog
 
+## v2.0.0-draft
+
+Major-version draft. Relay Console keeps the founding constraint: one
+standalone HTML file, no backend, no APIs, no external dependencies, and the
+user remains the wire between assistants.
+
+### Added
+- **Relay recipes.** The old hardcoded Debate and Blind modes are now built-in
+  relay plans alongside Ballot panel, Draft -> Critique -> Revise, Red team vs
+  Blue team + judge, and Custom plan.
+- **Custom plan editor.** Compose a running order from answer, blind, revise,
+  ballot, and synthesis steps, including the same model appearing more than
+  once with different jobs.
+- **Ballot panel.** Blind answers can be followed by anonymized peer rankings;
+  confirmed rankings are tallied with a Borda scoreboard and fed into the
+  synthesis prompt.
+- **Visible ballot correction.** Rankings are parsed only from explicit
+  `RANKING:` lines. Unparsed ballots are flagged, can be corrected with
+  dropdowns, and ask before advancing.
+- **Cockpit layout.** Wide screens split the run view into a sticky turn card
+  beside the transcript and scoreboard; narrow screens keep the classic
+  vertical flow.
+
+### Compatibility
+- v1.8.x and v1.9.0 sessions import into v2.0.0-draft.
+- v2 sessions may contain recipe, custom-step, and ballot fields that v1.x
+  versions do not understand. Treat v2 -> v1 as a one-way compatibility line.
+
+### Unchanged by design
+- Same Content-Security-Policy shape as v1.9.0.
+- Same local-storage keys for continuity.
+- Still one file, still zero network, still no answer-capture heuristics.
+
 ## v1.9.0
 
 Feature release. Sessions remain interchangeable with v1.8.x: v1.8.x files

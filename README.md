@@ -2,7 +2,7 @@
 
 **Relay Console is a local, offline, single-file HTML tool for manually relaying conversations between multiple AI assistants such as ChatGPT, Claude, Gemini, Perplexity, Copilot, Grok, DeepSeek, Mistral, Meta AI, Qwen, Kimi, Poe, or any custom chatbot.**
 
-It helps you run a structured copy-paste relay: write one question, choose the assistants, copy a generated prompt into one chatbot, paste its answer back, then continue the conversation through the next model. Relay Console tracks the transcript, builds each turn's prompt, supports debate and blind-comparison modes, and helps merge the results into one final answer.
+It helps you run a structured copy-paste relay: write one question, choose the assistants, copy a generated prompt into one chatbot, paste its answer back, then continue the conversation through the next model. Relay Console tracks the transcript, builds each turn's prompt, supports recipe-based multi-model workflows, and helps merge the results into one final answer.
 
 No API keys. No backend. No build step. No account. No server storage. You open the HTML file locally and you remain the wire between the models.
 
@@ -69,16 +69,19 @@ Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles an
 ## Features
 
 - **Quick-add chatbots.** Pick from a built-in list (Claude, ChatGPT, Gemini, Perplexity, Copilot, Grok, DeepSeek, Mistral, Meta AI, Qwen, Kimi, Poe) with the homepage prefilled, or add a custom one.
-- **Two modes.** Debate, where each model sees the conversation and responds to it, or Blind, where each answers cold and a final pass synthesizes them.
+- **Relay recipes.** Debate, Blind, Ballot panel, Draft -> Critique -> Revise, Red team vs Blue team + judge, or a Custom plan you compose from turn steps.
 - **Roles and reordering.** Give a model a job (skeptic, evidence checker, implementer) and set the running order.
 - **Curated context.** Each answer keeps its captured original; you can trim or drop what gets forwarded to later models without altering the record.
 - **Editable prompts** that persist per turn, with a live token estimate.
 - **Presets.** Save a roster plus settings under a name and reload it in one click.
 - **Collision-proof framing.** Quoted answers are fenced with a per-session token so pasted text can't break the prompt structure.
 - **Response-format control.** Markdown, plain prose, or a verbatim code block (the reliable way to move a table between models).
-- **Synthesis runner and grid compare.** Choose at setup which chatbot
-  runs the final synthesis, and flip the transcript into a side-by-side
-  grid to compare Blind answers before merging them.
+- **Peer ballots and scoreboard.** In Ballot panel, assistants rank anonymized
+  answers with explicit `RANKING:` lines; the visible Borda tally can feed the
+  synthesis prompt.
+- **Synthesis runner, grid compare, and cockpit layout.** Choose which chatbot
+  runs the final synthesis, compare answers side by side, and on wide screens
+  keep the active turn card beside the transcript.
 - **Light and dark themes** that follow your system, with a header toggle
   to force either and remember your choice.
 - **Markdown and JSON export/import**, plus first-run guidance for newcomers.
@@ -112,7 +115,7 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v1.9.0.html`). There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones.
+Each release is a self-contained file named by version (for example `relay-console-v1.9.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
 
 ## Support
 
