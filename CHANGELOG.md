@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.2.0 draft
+
+Development release focused on reusable localization and faster real-world
+workflows for ChatGPT and Claude subscribers.
+
+### Added
+- **Registered language packs.** Locale catalogs now register through one
+  validation path that checks key coverage and placeholder parity against the
+  English source catalog.
+- **Spanish interface and prompts.** Setup, relay controls, recipes, coaching,
+  alerts, accessibility labels, Markdown exports, and every generated prompt
+  are available in Spanish.
+- **Spanish ballot labels.** Strict ballot parsing accepts both
+  `CLASIFICACIÓN:` and `CLASIFICACION:` while retaining the complete-ranking
+  safety rules used by English and French ballots.
+- **ChatGPT and Claude quick starts.** Three editable setups cover drafting and
+  critique, independent comparison, and decision stress-testing without
+  changing the user's question.
+
+### Unchanged by design
+- The verified v2.1.0 release file and tag remain untouched.
+- The application remains one offline HTML file with no backend, external
+  dependencies, trackers, APIs, or automated answer capture.
+
 ## v2.1.0
 
 Feature release focused on multilingual use while preserving Relay
