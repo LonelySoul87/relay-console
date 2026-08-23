@@ -99,7 +99,7 @@
   .steps li::before{content:counter(s,decimal-leading-zero); position:absolute; left:16px; top:13px; font-family:var(--mono); font-size:12px; font-weight:600; color:var(--accent-text)}
 
   /* ---------- value cards ---------- */
-  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+  .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:14px}
   .mini{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--line); border-radius:16px; padding:22px; transition:transform .14s ease, border-color .14s ease}
   .mini:hover{transform:translateY(-2px); border-color:var(--signal); border-color:color-mix(in srgb,var(--signal) 35%, var(--line))}
   .mini .ico{width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:var(--bg-2); border:1px solid var(--line); color:var(--accent-text); margin-bottom:14px}
@@ -150,7 +150,7 @@
     <p class="eyebrow">Manual AI relay • local • no API</p>
     <h1>Relay Console</h1>
     <p class="lead">A local, offline, single&#8209;file HTML tool for relaying a question or task between ChatGPT, Claude, Gemini, and other AI assistants, by hand.</p>
-    <p class="sub">You copy each prompt out and paste each answer back. Relay Console keeps the multi&#8209;model conversation organized: the role framing, the running transcript, and the final synthesis. Nothing runs on its own.</p>
+    <p class="sub">You copy each prompt out and paste each answer back. Relay Console organizes six relay recipes, role framing, editable context, peer ballots, English and French prompts, the transcript, and final synthesis. Nothing runs on its own.</p>
     <div class="actions">
       <a class="btn primary" href="index.html">
         <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -200,7 +200,7 @@
       <div class="sep"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
       <div class="node loop">
         <div class="disc"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13-6l3 2M20 12a8 8 0 0 1-13 6l-3-2"/><path d="M20 4v4h-4M4 20v-4h4"/></svg></div>
-        <div class="meta-col"><span class="tag">repeat</span><span class="ntitle">Next assistant</span><span class="ncap">Debate, or blind comparison.</span></div>
+        <div class="meta-col"><span class="tag">repeat</span><span class="ntitle">Next assistant</span><span class="ncap">Debate, blind, ballot, or custom plan.</span></div>
       </div>
       <div class="sep"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
       <div class="node console">
@@ -213,7 +213,7 @@
       <li>Write one question and choose the assistants.</li>
       <li>Relay Console builds a prompt with role framing and the relevant context.</li>
       <li>Copy the prompt into the selected chatbot, then paste the answer back.</li>
-      <li>Continue through debate or blind&#8209;comparison mode, then synthesize the results.</li>
+      <li>Continue through the chosen recipe, then synthesize the results.</li>
     </ol>
   </section>
 
@@ -235,6 +235,11 @@
       <div class="ico"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 7V4M15 7V4M8 7h8v3a4 4 0 0 1-8 0z"/><path d="M12 14v3a3 3 0 0 0 3 3h2"/><path d="M4 5l16 14"/></svg></div>
       <h3>No API orchestration</h3>
       <p>Relay Console does not call model APIs or drive chatbot tabs. It organizes the manual relay; the carrying across is yours.</p>
+    </div>
+    <div class="mini">
+      <div class="ico"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4a13 13 0 0 1 0 16M12 4a13 13 0 0 0 0 16"/></svg></div>
+      <h3>English and French</h3>
+      <p>Choose the interface language and generated-prompt language separately, then keep both choices across reloads and saved sessions.</p>
     </div>
     </div>
   </section>

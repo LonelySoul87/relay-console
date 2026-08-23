@@ -12,6 +12,7 @@ A Developer Certificate of Origin (DCO) on its own is not enough here, because t
 
 - It stays one file, no build, no backend, no network calls. The offline-and-privacy promise and the Content-Security-Policy are core to the product; a change that adds a remote resource will not be accepted.
 - It matches the existing code style and keeps the page working when opened directly from disk.
+- It does not use the Unicode em dash character (U+2014) in product or release copy. Use a period, comma, colon, or semicolon instead.
 - It does not introduce a third-party dependency. The clean, dependency-free codebase is what keeps the dual-license workable.
 
 ## The chatbot suggestion list
