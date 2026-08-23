@@ -4,7 +4,7 @@ Use this copy for a small GitHub Pages site or project page.
 
 ## Title
 
-Relay Console — Local Offline AI Assistant Relay
+Relay Console: Local Offline AI Assistant Relay
 
 ## Meta description
 

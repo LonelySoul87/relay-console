@@ -1,5 +1,51 @@
 # Changelog
 
+## v2.1.0
+
+Feature release focused on multilingual use while preserving Relay
+Console's standalone, offline, single-file design.
+
+### Added
+- **French interface.** Setup, run controls, recipes, coaching, scorecards,
+  completion statistics, alerts, accessibility labels, and Markdown exports can
+  now be displayed in French.
+- **Independent prompt language.** Interface language and generated-prompt
+  language are separate choices. A French interface can still prepare English
+  prompts, or the reverse, and both choices persist across reloads.
+- **Localized workflows.** Every built-in recipe and turn type now generates
+  native French instructions, including blind answers, debates, revisions,
+  ballots, synthesis, response-format directives, and Borda tallies.
+- **Embedded localization foundation.** English and French catalogs, fallback
+  behavior, placeholder validation, and browser-language detection remain
+  inside the standalone HTML file with no external dependency or network call.
+
+### Fixed and hardened
+- French ballot prompts request an exact `CLASSEMENT :` line while retaining
+  support for English `RANKING:` input; the same strict complete-permutation
+  rules still apply.
+- Captured questions, answers, names, roles, and edited forwarded context remain
+  verbatim when the surrounding interface, prompts, or transcript are localized.
+- Older saved sessions safely default to English prompts, while v2.1 sessions
+  preserve both language choices.
+- Automatic recipe role suggestions continue adapting after reload instead of
+  being mistaken for user-authored roles.
+- Copy-only synthesis no longer displays an external-link arrow, and translated
+  rich-text labels no longer render as an undefined value.
+- French point labels now use the correct singular and plural forms.
+- The v2 regression workflow now checks both the released v2.0 file and the
+  v2.1 draft suite so backward compatibility remains covered.
+
+### Compatibility
+- v1.x and v2.0 sessions import into v2.1; missing language metadata defaults
+  conservatively to English.
+- v2.1 adds optional `uiLocale` and `promptLocale` metadata. Older versions may
+  ignore those fields and should still be treated as a one-way compatibility
+  line when moving a session back to an older release.
+
+### Unchanged by design
+- Still one HTML file, with no backend, API keys, build step, trackers, remote
+  assets, or answer-capture automation.
+
 ## v2.0.0
 
 Major-version release. Relay Console keeps the founding constraint: one
@@ -68,7 +114,7 @@ ignores the new optional `synthPid` field.
 ### Added
 - **Synthesis runner.** When a relay ends in a synthesis turn, you can pick
   at setup which chatbot receives the merge prompt; Copy & open then opens
-  that tab. Optional — leaving it unset keeps the old behavior.
+  that tab. Optional; leaving it unset keeps the old behavior.
 - **Grid view.** The transcript can switch between the classic list and a
   side-by-side grid, which is the honest way to compare a Blind round
   before synthesis. The choice is remembered.

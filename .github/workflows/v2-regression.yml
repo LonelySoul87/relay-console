@@ -4,12 +4,16 @@ on:
   push:
     paths:
       - "relay-console-v2.0.0.html"
+      - "relay-console-v2.1.0.html"
       - "tests/relay-console-v2.test.mjs"
+      - "tests/relay-console-v2.1.test.mjs"
       - ".github/workflows/v2-regression.yml"
   pull_request:
     paths:
       - "relay-console-v2.0.0.html"
+      - "relay-console-v2.1.0.html"
       - "tests/relay-console-v2.test.mjs"
+      - "tests/relay-console-v2.1.test.mjs"
       - ".github/workflows/v2-regression.yml"
 
 permissions:
@@ -24,5 +28,5 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Run standalone regression suite
-        run: node --test tests/relay-console-v2.test.mjs
+      - name: Run standalone regression suites
+        run: node --test tests/relay-console-v2.test.mjs tests/relay-console-v2.1.test.mjs

@@ -2,7 +2,7 @@
 
 Suggested release title:
 
-Relay Console vX.Y.Z — single-file offline AI relay tool
+Relay Console vX.Y.Z: single-file offline AI relay tool
 
 Opening sentence:
 

@@ -68,6 +68,9 @@ Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles an
 
 ## Features
 
+- **English and French.** Choose the interface language and generated-prompt
+  language independently, so the controls and the AI conversation do not have
+  to use the same language.
 - **Quick-add chatbots.** Pick from a built-in list (Claude, ChatGPT, Gemini, Perplexity, Copilot, Grok, DeepSeek, Mistral, Meta AI, Qwen, Kimi, Poe) with the homepage prefilled, or add a custom one.
 - **Relay recipes.** Debate, Blind, Ballot panel, Draft -> Critique -> Revise, Red team vs Blue team + judge, or a Custom plan you compose from turn steps.
 - **Roles and reordering.** Give a model a job (skeptic, evidence checker, implementer) and set the running order.
@@ -115,7 +118,7 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v2.0.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
+Each release is a self-contained file named by version (for example `relay-console-v2.1.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
 
 ## Support
 
