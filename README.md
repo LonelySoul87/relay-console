@@ -22,7 +22,8 @@ Use it when you want ChatGPT, Claude, Gemini, Perplexity, Grok, DeepSeek, or oth
 
 1. Download the HTML file from the latest [release](../../releases).
 2. Open it in any modern browser. That's it; there is nothing to install.
-3. Write a question, pick which chatbots you're using, and start the relay.
+3. Write a question, choose a quick start or configure the chatbots yourself,
+   and start the relay.
 
 Optionally, keep it as a bookmark or a local file for offline use.
 
@@ -68,9 +69,12 @@ Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles an
 
 ## Features
 
-- **English and French.** Choose the interface language and generated-prompt
+- **English, French, and Spanish.** Choose the interface language and generated-prompt
   language independently, so the controls and the AI conversation do not have
   to use the same language.
+- **ChatGPT and Claude quick starts.** Apply an editable two-model setup for
+  drafting and critique, independent comparison, or decision stress-testing
+  without changing the question you wrote.
 - **Quick-add chatbots.** Pick from a built-in list (Claude, ChatGPT, Gemini, Perplexity, Copilot, Grok, DeepSeek, Mistral, Meta AI, Qwen, Kimi, Poe) with the homepage prefilled, or add a custom one.
 - **Relay recipes.** Debate, Blind, Ballot panel, Draft -> Critique -> Revise, Red team vs Blue team + judge, or a Custom plan you compose from turn steps.
 - **Roles and reordering.** Give a model a job (skeptic, evidence checker, implementer) and set the running order.
@@ -118,7 +122,7 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v2.1.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
+Each release is a self-contained file named by version (for example `relay-console-v2.2.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
 
 ## Support
 
