@@ -23,6 +23,31 @@ user remains the wire between assistants.
   beside the transcript and scoreboard; narrow screens keep the classic
   vertical flow.
 
+### Fixed and hardened
+- Ballots now count only one explicit, complete `RANKING:` line containing an
+  exact permutation of the available labels. Ordinary prose, partial lists,
+  duplicates, extra labels, and multiple ranking lines are rejected.
+- Parsed rankings and manual ballot corrections survive reloads. Manual
+  corrections can be reparsed deliberately, and a visible confirmation button
+  supports an unchanged A-to-Z order.
+- Changing a recorded ballot now marks every dependent synthesis answer and
+  edited synthesis prompt as stale before the scoreboard changes underneath it.
+- Ballot and synthesis roles are now woven into their prompts, including the
+  built-in reviewer and judge roles and roles from custom plans.
+- Session import now normalizes duplicate participant IDs, validates rankings
+  as exact permutations, rebuilds missing parsed ballots from saved replies,
+  protects first-turn work from replacement, and caps rosters at the A-Z ballot
+  limit of 26 participants.
+- Excluding a draft from forwarded context no longer inserts a literal `null`
+  into a later revision prompt.
+- Explicitly saving a rechecked answer clears its stale warning even when the
+  answer text did not change; Back and Skip do not falsely clear it.
+- Setup, participant, custom-step, prompt, answer, and ballot controls now have
+  explicit and uniquely contextual accessible names.
+- Added a zero-dependency Node regression suite and a GitHub Actions workflow
+  covering recipe construction, ballots, roles, staleness, imports, presets,
+  accessibility hooks, privacy boundaries, and real legacy session fixtures.
+
 ### Compatibility
 - v1.8.x and v1.9.0 sessions import into v2.0.0-draft.
 - v2 sessions may contain recipe, custom-step, and ballot fields that v1.x
