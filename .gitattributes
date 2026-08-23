@@ -1,0 +1,4 @@
+# Versioned release artifacts must keep byte-exact line endings for checksums.
+relay-console-v*.html -text
+index.html -text
+landing.html -text

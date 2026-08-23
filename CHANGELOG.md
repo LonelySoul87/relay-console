@@ -1,5 +1,64 @@
 # Changelog
 
+## v2.0.0
+
+Major-version release. Relay Console keeps the founding constraint: one
+standalone HTML file, no backend, no APIs, no external dependencies, and the
+user remains the wire between assistants.
+
+### Added
+- **Relay recipes.** The old hardcoded Debate and Blind modes are now built-in
+  relay plans alongside Ballot panel, Draft -> Critique -> Revise, Red team vs
+  Blue team + judge, and Custom plan.
+- **Custom plan editor.** Compose a running order from answer, blind, revise,
+  ballot, and synthesis steps, including the same model appearing more than
+  once with different jobs.
+- **Ballot panel.** Blind answers can be followed by anonymized peer rankings;
+  confirmed rankings are tallied with a Borda scoreboard and fed into the
+  synthesis prompt.
+- **Visible ballot correction.** Rankings are parsed only from explicit
+  `RANKING:` lines. Unparsed ballots are flagged, can be corrected with
+  dropdowns, and ask before advancing.
+- **Cockpit layout.** Wide screens split the run view into a sticky turn card
+  beside the transcript and scoreboard; narrow screens keep the classic
+  vertical flow.
+
+### Fixed and hardened
+- Ballots now count only one explicit, complete `RANKING:` line containing an
+  exact permutation of the available labels. Ordinary prose, partial lists,
+  duplicates, extra labels, and multiple ranking lines are rejected.
+- Parsed rankings and manual ballot corrections survive reloads. Manual
+  corrections can be reparsed deliberately, and a visible confirmation button
+  supports an unchanged A-to-Z order.
+- Changing a recorded ballot now marks every dependent synthesis answer and
+  edited synthesis prompt as stale before the scoreboard changes underneath it.
+- Ballot and synthesis roles are now woven into their prompts, including the
+  built-in reviewer and judge roles and roles from custom plans.
+- Session import now normalizes duplicate participant IDs, validates rankings
+  as exact permutations, rebuilds missing parsed ballots from saved replies,
+  protects first-turn work from replacement, and caps rosters at the A-Z ballot
+  limit of 26 participants.
+- Excluding a draft from forwarded context no longer inserts a literal `null`
+  into a later revision prompt.
+- Explicitly saving a rechecked answer clears its stale warning even when the
+  answer text did not change; Back and Skip do not falsely clear it.
+- Setup, participant, custom-step, prompt, answer, and ballot controls now have
+  explicit and uniquely contextual accessible names.
+- Added a zero-dependency Node regression suite and a GitHub Actions workflow
+  covering recipe construction, ballots, roles, staleness, imports, presets,
+  accessibility hooks, privacy boundaries, and sanitized legacy session
+  fixtures. Ignored real legacy exports are also checked when present locally.
+
+### Compatibility
+- v1.8.x and v1.9.0 sessions import into v2.0.0.
+- v2 sessions may contain recipe, custom-step, and ballot fields that v1.x
+  versions do not understand. Treat v2 -> v1 as a one-way compatibility line.
+
+### Unchanged by design
+- Same Content-Security-Policy shape as v1.9.0.
+- Same local-storage keys for continuity.
+- Still one file, still zero network, still no answer-capture heuristics.
+
 ## v1.9.0
 
 Feature release. Sessions remain interchangeable with v1.8.x: v1.8.x files
