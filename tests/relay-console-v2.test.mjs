@@ -4,7 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 import {fileURLToPath} from "node:url";
 
-const htmlPath=fileURLToPath(new URL("../relay-console-v2.0.0-draft.html",import.meta.url));
+const htmlPath=fileURLToPath(new URL("../relay-console-v2.0.0.html",import.meta.url));
 const html=readFileSync(htmlPath,"utf8");
 const scriptStart=html.indexOf("<script>")+8;
 const scriptEnd=html.lastIndexOf("</script>");
@@ -76,13 +76,13 @@ globalThis.__relayTest={
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;}
 };`;
-vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.0.0-draft.html"});
+vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.0.0.html"});
 const app=sandbox.__relayTest;
 
 function participant(id,name){return {id,name,color:"#10a37f",url:"",role:""};}
 function stateFor(turns,participants,answers){
   return {
-    version:"2.0.0-draft",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",nonce:"RXTEST1234",
+    version:"2.0.0",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",nonce:"RXTEST1234",
     participants,turns,synthPid:null,answers,forward:turns.map(()=>null),stale:turns.map(()=>false),prompts:turns.map(()=>null),
     promptStale:turns.map(()=>false),draftAnswers:turns.map(()=>null),review:turns.map(()=>false),ballots:turns.map(()=>null),ballotManual:turns.map(()=>false),cursor:0,ended:false,ts:1
   };
@@ -91,6 +91,9 @@ function stateFor(turns,participants,answers){
 test("embedded JavaScript loads in a minimal browser environment",()=>{
   assert.equal(typeof app.parseBallot,"function");
   assert.equal(app.MAX_PARTICIPANTS,26);
+  assert.match(html,/<title>Relay Console v2\.0\.0<\/title>/);
+  assert.match(html,/const VERSION="2\.0\.0";/);
+  assert.doesNotMatch(html,/2\.0\.0-draft/);
 });
 
 test("ballot parser accepts one explicit, exact ranking line",()=>{
@@ -192,7 +195,7 @@ test("explicitly saving an unchanged answer clears its stale warning, while Back
 
 test("session validation restores a parsed draft ballot and preserves a valid manual correction",()=>{
   const raw={
-    version:"2.0.0-draft",question:"Q",recipe:"ballot",mode:"blind",participants:[participant("p0","A"),participant("p1","B")],
+    version:"2.0.0",question:"Q",recipe:"ballot",mode:"blind",participants:[participant("p0","A"),participant("p1","B")],
     turns:[
       {pid:"p0",name:"A",color:"#10a37f",round:1,kind:"blind"},
       {pid:"p1",name:"B",color:"#4f8cf7",round:1,kind:"blind"},

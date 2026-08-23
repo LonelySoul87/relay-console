@@ -1,8 +1,8 @@
 # Changelog
 
-## v2.0.0-draft
+## v2.0.0
 
-Major-version draft. Relay Console keeps the founding constraint: one
+Major-version release. Relay Console keeps the founding constraint: one
 standalone HTML file, no backend, no APIs, no external dependencies, and the
 user remains the wire between assistants.
 
@@ -50,7 +50,7 @@ user remains the wire between assistants.
   fixtures. Ignored real legacy exports are also checked when present locally.
 
 ### Compatibility
-- v1.8.x and v1.9.0 sessions import into v2.0.0-draft.
+- v1.8.x and v1.9.0 sessions import into v2.0.0.
 - v2 sessions may contain recipe, custom-step, and ballot fields that v1.x
   versions do not understand. Treat v2 -> v1 as a one-way compatibility line.
 

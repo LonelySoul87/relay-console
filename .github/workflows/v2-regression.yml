@@ -3,12 +3,12 @@ name: v2 regression checks
 on:
   push:
     paths:
-      - "relay-console-v2.0.0-draft.html"
+      - "relay-console-v2.0.0.html"
       - "tests/relay-console-v2.test.mjs"
       - ".github/workflows/v2-regression.yml"
   pull_request:
     paths:
-      - "relay-console-v2.0.0-draft.html"
+      - "relay-console-v2.0.0.html"
       - "tests/relay-console-v2.test.mjs"
       - ".github/workflows/v2-regression.yml"
 
@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
       - name: Run standalone regression suite
         run: node --test tests/relay-console-v2.test.mjs
