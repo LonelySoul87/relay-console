@@ -1,8 +1,8 @@
 # Changelog
 
-## v2.2.0 draft
+## v2.2.0
 
-Development release focused on reusable localization and faster real-world
+Feature release focused on reusable localization and faster real-world
 workflows for ChatGPT and Claude subscribers.
 
 ### Added
@@ -20,7 +20,7 @@ workflows for ChatGPT and Claude subscribers.
   changing the user's question.
 
 ### Unchanged by design
-- The verified v2.1.0 release file and tag remain untouched.
+- Earlier tagged release files and tags remain untouched.
 - The application remains one offline HTML file with no backend, external
   dependencies, trackers, APIs, or automated answer capture.
 

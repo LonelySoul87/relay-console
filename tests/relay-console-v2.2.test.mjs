@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {existsSync,readFileSync} from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 import {fileURLToPath} from "node:url";
 
-const htmlPath=fileURLToPath(new URL("../relay-console-v2.2.0-draft.html",import.meta.url));
+const htmlPath=fileURLToPath(new URL("../relay-console-v2.2.0.html",import.meta.url));
 const html=readFileSync(htmlPath,"utf8");
 const scriptStart=html.indexOf("<script>")+8;
 const scriptEnd=html.lastIndexOf("</script>");
@@ -78,33 +79,37 @@ globalThis.__relayTest={
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
 };`;
-vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.2.0-draft.html"});
+vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.2.0.html"});
 const app=sandbox.__relayTest;
 
 function participant(id,name){return {id,name,color:"#10a37f",url:"",role:""};}
 function stateFor(turns,participants,answers){
   return {
-    version:"2.2.0-draft",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
+    version:"2.2.0",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
     participants,turns,synthPid:null,answers,forward:turns.map(()=>null),stale:turns.map(()=>false),prompts:turns.map(()=>null),
     promptStale:turns.map(()=>false),draftAnswers:turns.map(()=>null),review:turns.map(()=>false),ballots:turns.map(()=>null),ballotManual:turns.map(()=>false),cursor:0,ended:false,ts:1
   };
 }
 
-test("v2.2 draft JavaScript loads in a minimal browser environment",()=>{
+test("v2.2 JavaScript loads in a minimal browser environment",()=>{
   assert.equal(typeof app.parseBallot,"function");
   assert.equal(app.MAX_PARTICIPANTS,26);
-  assert.match(html,/<title>Relay Console v2\.2\.0 draft<\/title>/);
-  assert.match(html,/const VERSION="2\.2\.0-draft";/);
+  assert.match(html,/<title>Relay Console v2\.2\.0<\/title>/);
+  assert.match(html,/const VERSION="2\.2\.0";/);
+  assert.doesNotMatch(html,/v2\.2\.0 draft|2\.2\.0-draft/);
   assert.match(html,/id="uiLocale"/);
   assert.match(html,/id="promptLocale"/);
   assert.match(html,/registerLocale\("es","Español",ES\)/);
   assert.match(html,/data-starter="dcr"/);
   assert.equal(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url)),"utf8"),html);
+  const digest=createHash("sha256").update(html).digest("hex");
+  const sums=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)),"utf8");
+  assert.match(sums,new RegExp(`^${digest}  relay-console-v2\\.2\\.0\\.html$`,"m"));
   assert.match(html,/el\.innerHTML=t\(el\.dataset\.i18nHtml/);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
 });
 
-test("active v2.2 draft product and planning text contains no em dashes",()=>{
+test("active v2.2 product and release text contains no em dashes",()=>{
   const paths=[
     htmlPath,
     fileURLToPath(new URL("../index.html",import.meta.url)),
@@ -116,7 +121,9 @@ test("active v2.2 draft product and planning text contains no em dashes",()=>{
     fileURLToPath(new URL("../docs/release-template.md",import.meta.url)),
     fileURLToPath(new URL("../docs/visibility.md",import.meta.url)),
     fileURLToPath(new URL("../docs/v2.2.0-roadmap.md",import.meta.url)),
-    fileURLToPath(new URL("../docs/v2.2.0-progress.md",import.meta.url))
+    fileURLToPath(new URL("../docs/v2.2.0-progress.md",import.meta.url)),
+    fileURLToPath(new URL("../docs/v2.2.0-release-notes.md",import.meta.url)),
+    fileURLToPath(new URL("../docs/v2.2.0-release-audit.md",import.meta.url))
   ];
   for(const path of paths) assert.doesNotMatch(readFileSync(path,"utf8"),/\u2014/,path);
 });
