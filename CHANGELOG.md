@@ -46,7 +46,8 @@ user remains the wire between assistants.
   explicit and uniquely contextual accessible names.
 - Added a zero-dependency Node regression suite and a GitHub Actions workflow
   covering recipe construction, ballots, roles, staleness, imports, presets,
-  accessibility hooks, privacy boundaries, and real legacy session fixtures.
+  accessibility hooks, privacy boundaries, and sanitized legacy session
+  fixtures. Ignored real legacy exports are also checked when present locally.
 
 ### Compatibility
 - v1.8.x and v1.9.0 sessions import into v2.0.0-draft.

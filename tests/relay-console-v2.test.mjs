@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {readFileSync} from "node:fs";
+import {existsSync,readFileSync} from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 import {fileURLToPath} from "node:url";
@@ -270,12 +270,64 @@ test("standalone privacy boundary remains intact",()=>{
   assert.doesNotMatch(html,/\b(?:fetch|XMLHttpRequest|sendBeacon|WebSocket|EventSource|Worker|SharedWorker)\s*\(/);
 });
 
-for(const name of ["relay-session-v1.0.json","relay-session-v1.8.2.json","relay-session-v1.8.2(1).json","relay-session-v1.8.2(2).json"]){
+const legacyV10={
+  version:"1.0",question:"Sanitized legacy debate",mode:"debate",rounds:1,closing:false,
+  participants:[
+    {name:"Model A",color:"#2563eb",url:"https://example.test/a",role:"Analyst"},
+    {name:"Model B",color:"#7c3aed",url:"https://example.test/b",role:"Critic"}
+  ],
+  turns:[
+    {name:"Model A",color:"#2563eb",role:"Analyst",round:1,kind:"debate"},
+    {name:"Model B",color:"#7c3aed",role:"Critic",round:1,kind:"debate"}
+  ],
+  answers:["First legacy answer","Second legacy answer"],cursor:2,ended:true,ts:1700000000000
+};
+
+function legacyV182({cursor=0,ended=false,closing=false,turnCount=2}={}){
+  const participants=[
+    {id:"legacy-a",name:"Model A",color:"#2563eb",url:"https://example.test/a",role:"Analyst"},
+    {id:"legacy-b",name:"Model B",color:"#7c3aed",url:"https://example.test/b",role:"Critic"}
+  ];
+  const turns=Array.from({length:turnCount},(_,i)=>{
+    const p=participants[i%participants.length];
+    return {pid:p.id,name:p.name,color:p.color,role:p.role,round:Math.floor(i/2)+1,kind:"debate"};
+  });
+  if(closing) turns.push({pid:null,name:"Synthesis",color:"#334155",role:"Editor",round:0,kind:"synth"});
+  const answers=turns.map((_,i)=>i<cursor?`Legacy answer ${i+1}`:"");
+  return {
+    version:"1.8.2",question:"Sanitized extended legacy session",mode:"debate",rounds:2,closing,
+    format:"markdown",nonce:"LEGACY82",participants,turns,answers,
+    forward:turns.map(()=>null),stale:turns.map(()=>false),prompts:turns.map(()=>null),
+    draftAnswers:turns.map(()=>null),review:turns.map(()=>false),cursor,ended,ts:1700000000000
+  };
+}
+
+const sanitizedLegacyFixtures=[
+  ["v1.0 session without participant IDs",legacyV10],
+  ["v1.8.2 session at its first turn",legacyV182()],
+  ["v1.8.2 partially completed session",legacyV182({cursor:1,turnCount:3})],
+  ["v1.8.2 completed session with synthesis",legacyV182({cursor:5,ended:true,closing:true,turnCount:4})]
+];
+
+for(const [name,raw] of sanitizedLegacyFixtures){
   test(`legacy session remains compatible: ${name}`,()=>{
-    const raw=JSON.parse(readFileSync(fileURLToPath(new URL(`../sessions/${name}`,import.meta.url)),"utf8"));
     const value=app.validateSession(raw);
     assert.ok(value.participants.length>=2);
+    assert.equal(new Set(value.participants.map(p=>p.id)).size,value.participants.length);
     assert.equal(value.turns.length,value.answers.length);
     assert.ok(value.cursor>=0&&value.cursor<=value.turns.length);
+  });
+}
+
+const localLegacyNames=["relay-session-v1.0.json","relay-session-v1.8.2.json","relay-session-v1.8.2(1).json","relay-session-v1.8.2(2).json"];
+const localLegacyPaths=localLegacyNames.map(name=>fileURLToPath(new URL(`../sessions/${name}`,import.meta.url)));
+if(localLegacyPaths.every(existsSync)){
+  test("local real legacy session exports remain compatible",()=>{
+    for(const path of localLegacyPaths){
+      const value=app.validateSession(JSON.parse(readFileSync(path,"utf8")));
+      assert.ok(value.participants.length>=2);
+      assert.equal(value.turns.length,value.answers.length);
+      assert.ok(value.cursor>=0&&value.cursor<=value.turns.length);
+    }
   });
 }
