@@ -4,9 +4,14 @@ on:
   push:
     paths:
       - ".gitattributes"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "README.md"
       - "SHA256SUMS.txt"
       - "index.html"
+      - "landing.html"
       - "relay-console-v*.html"
+      - "docs/*.md"
       - "tests/relay-console-v2.test.mjs"
       - "tests/relay-console-v2.1.test.mjs"
       - "tests/relay-console-v2.2.test.mjs"
@@ -14,9 +19,14 @@ on:
   pull_request:
     paths:
       - ".gitattributes"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "README.md"
       - "SHA256SUMS.txt"
       - "index.html"
+      - "landing.html"
       - "relay-console-v*.html"
+      - "docs/*.md"
       - "tests/relay-console-v2.test.mjs"
       - "tests/relay-console-v2.1.test.mjs"
       - "tests/relay-console-v2.2.test.mjs"
