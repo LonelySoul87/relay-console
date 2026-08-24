@@ -1,4 +1,7 @@
+* text=auto
+
 # Versioned release artifacts must keep byte-exact line endings for checksums.
+SHA256SUMS.txt text eol=lf
 relay-console-v*.html -text
 index.html -text
 landing.html -text

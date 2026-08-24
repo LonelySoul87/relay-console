@@ -102,9 +102,17 @@ test("v2.2 JavaScript loads in a minimal browser environment",()=>{
   assert.match(html,/registerLocale\("es","Español",ES\)/);
   assert.match(html,/data-starter="dcr"/);
   assert.equal(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url)),"utf8"),html);
-  const digest=createHash("sha256").update(html).digest("hex");
   const sums=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)),"utf8");
-  assert.match(sums,new RegExp(`^${digest}  relay-console-v2\\.2\\.0\\.html$`,"m"));
+  const expectedFiles=["relay-console-v1.8.2.html","relay-console-v1.8.3.html","relay-console-v1.8.4.html","relay-console-v1.9.0.html","relay-console-v2.0.0.html","relay-console-v2.1.0.html","relay-console-v2.2.0.html"];
+  const sumLines=sums.trim().split(/\r?\n/);
+  assert.equal(sumLines.length,expectedFiles.length);
+  for(const [i,line] of sumLines.entries()){
+    const match=line.match(/^([0-9a-f]{64})  (relay-console-v[0-9.]+\.html)$/);
+    assert.ok(match,line);
+    assert.equal(match[2],expectedFiles[i]);
+    const releaseBytes=readFileSync(fileURLToPath(new URL(`../${match[2]}`,import.meta.url)));
+    assert.equal(createHash("sha256").update(releaseBytes).digest("hex"),match[1],match[2]);
+  }
   assert.match(html,/el\.innerHTML=t\(el\.dataset\.i18nHtml/);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
 });
