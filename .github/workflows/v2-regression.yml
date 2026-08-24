@@ -3,18 +3,20 @@ name: v2 regression checks
 on:
   push:
     paths:
-      - "relay-console-v2.0.0.html"
-      - "relay-console-v2.1.0.html"
-      - "relay-console-v2.2.0.html"
+      - ".gitattributes"
+      - "SHA256SUMS.txt"
+      - "index.html"
+      - "relay-console-v*.html"
       - "tests/relay-console-v2.test.mjs"
       - "tests/relay-console-v2.1.test.mjs"
       - "tests/relay-console-v2.2.test.mjs"
       - ".github/workflows/v2-regression.yml"
   pull_request:
     paths:
-      - "relay-console-v2.0.0.html"
-      - "relay-console-v2.1.0.html"
-      - "relay-console-v2.2.0.html"
+      - ".gitattributes"
+      - "SHA256SUMS.txt"
+      - "index.html"
+      - "relay-console-v*.html"
       - "tests/relay-console-v2.test.mjs"
       - "tests/relay-console-v2.1.test.mjs"
       - "tests/relay-console-v2.2.test.mjs"
