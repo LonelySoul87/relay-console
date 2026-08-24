@@ -124,6 +124,34 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 Each release is a self-contained file named by version (for example `relay-console-v2.2.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
 
+## Verify a download
+
+Each GitHub release includes a one-file `SHA256SUMS.txt` attachment for the HTML file published on that release page. Download both files into the same folder, then verify them before opening the app.
+
+On Windows PowerShell:
+
+```powershell
+$line = Get-Content .\SHA256SUMS.txt
+$expected, $file = $line -split '\s+', 2
+(Get-FileHash -Algorithm SHA256 -LiteralPath $file.Trim()).Hash.ToLower() -eq $expected
+```
+
+On Linux:
+
+```sh
+sha256sum --check SHA256SUMS.txt
+```
+
+On macOS:
+
+```sh
+shasum -a 256 --check SHA256SUMS.txt
+```
+
+A successful check prints `True` on PowerShell or `OK` on Linux and macOS. The repository-root `SHA256SUMS.txt` describes the versioned files as they exist on the current `main` branch. Release-page checksum files describe the exact public download for that release.
+
+The v1.8.2 release intentionally has a different checksum from the v1.8.2 file currently on `main`. Its public download still matches the immutable v1.8.2 tag, while the copy on `main` received a later copyright-name correction. Use the checksum attached to the v1.8.2 release when verifying that historical download.
+
 ## Support
 
 I build local-first software projects, including Relay Console. If this tool saves you time or helps your workflow, you can support current and future development here:
