@@ -201,7 +201,9 @@
   /* ===== relay track (signature) ===== */
   .lanewrap{position:relative}
   .lane{position:relative;display:flex;align-items:flex-start;gap:0;padding:32px 6px 8px;overflow-x:auto;scrollbar-width:thin}
-  .station{position:relative;flex:1;min-width:88px;text-align:center}
+  .station{position:relative;flex:1;min-width:88px;text-align:center;background:transparent;border:0;color:inherit;padding:0;cursor:pointer;font:inherit}
+  .station:focus-visible{outline:2px solid var(--signal);outline-offset:4px;border-radius:8px}
+  .station:disabled{cursor:not-allowed;opacity:.48}
   .station .bar{height:4px;border-radius:3px;background:var(--line);position:absolute;top:18px;left:50%;width:100%;z-index:0;transition:background .5s ease}
   .station .bar.lit{background:linear-gradient(90deg,var(--signal),var(--signal-2))}
   .station:last-child .bar{display:none}
@@ -312,6 +314,15 @@
   .coach-step.done{color:var(--ok)}
   .coach .linkbtn{margin-top:8px}
   .reviewtag{font-family:var(--mono);font-size:10px;color:var(--accent-text)}
+  .transcriptfilters{margin-top:13px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--bg-2)}
+  .filterhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+  .filtertitle{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .filtergrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .filtergrid label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+  .filtergrid select,.filtergrid input{display:block;width:100%;margin-top:5px;padding:7px 9px;font-family:var(--sans);font-size:12.5px;letter-spacing:0;text-transform:none}
+  .filtergrid .filtersearch{grid-column:1/-1}
+  .filterstatus{min-height:1.4em;margin:8px 0 0;font-size:11.5px;color:var(--muted)}
+  @media (max-width:430px){.filtergrid{grid-template-columns:1fr}.filtergrid .filtersearch{grid-column:auto}}
   #helpBtn{margin-left:auto}
   .copied.fail{color:var(--danger)}
   .callout{border:1px solid var(--danger);border-radius:10px;padding:10px 12px;margin:0 0 10px;background:color-mix(in srgb,var(--danger) 10%,var(--panel))}
@@ -503,7 +514,7 @@
     </details>
 
     <div class="card" id="laneCard" style="padding-bottom:14px">
-      <div class="lanewrap"><div class="lane" id="lane" role="img"></div></div>
+      <div class="lanewrap"><div class="lane" id="lane" role="navigation" aria-label="Relay turn navigation" data-i18n-aria="lane.navigation"></div></div>
     </div>
 
     <div class="card" id="turnCard">
@@ -595,6 +606,20 @@
         </div>
         <p class="hint" style="margin-top:2px" data-i18n="transcript.hint">The text here is the answer you captured. Trimming what's sent forward never alters this copy or the exports; it only changes what later models receive. Grid view lays answers side by side for honest comparison.</p>
         <p class="hint" data-i18n="transcript.packetWarning">Review packets contain every captured answer in full, even when context was trimmed or excluded. Check for sensitive information before sharing. Trimming is not redaction.</p>
+        <section class="transcriptfilters" aria-labelledby="transcriptFilterHeading">
+          <div class="filterhead">
+            <span class="filtertitle" id="transcriptFilterHeading" data-i18n="transcript.filters">Filter turns</span>
+            <button class="tiny" id="transcriptFilterClear" data-i18n="transcript.clearFilters">Clear filters</button>
+          </div>
+          <div class="filtergrid">
+            <label><span data-i18n="transcript.filterParticipant">Participant</span><select id="transcriptFilterParticipant"></select></label>
+            <label><span data-i18n="transcript.filterKind">Turn type</span><select id="transcriptFilterKind"></select></label>
+            <label><span data-i18n="transcript.filterRound">Round</span><select id="transcriptFilterRound"></select></label>
+            <label><span data-i18n="transcript.filterState">State</span><select id="transcriptFilterState"></select></label>
+            <label class="filtersearch"><span data-i18n="transcript.filterText">Text match</span><input id="transcriptFilterQuery" type="search" autocomplete="off" placeholder="Search captured text and labels" data-i18n-placeholder="transcript.filterPlaceholder"></label>
+          </div>
+          <p class="filterstatus" id="transcriptFilterStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+        </section>
         <div id="transcript" style="margin-top:14px"></div>
       </div>
     </div>
@@ -682,7 +707,8 @@ const EN={
   "done.heading":"Relay complete","done.download":"Download transcript (.md)","done.copyFinal":"Copy final answer","done.reopen":"Reopen last turn","done.restart":"New relay","done.none":"No answers recorded yet. Reopen a turn or start fresh.","done.withSynth":"{answers} plus a synthesis captured. Download it or keep going.","done.withoutSynth":"{answers} captured. Download the transcript or keep going.",
   "score.heading":"Peer ranking","score.note":"Borda tally of the models' own pasted rankings: with n answers, 1st place earns n−1 points, last earns 0. Only confirmed ballots count.","score.point.one":"{points} pt","score.point.other":"{points} pts",
   "transcript.heading":"Transcript","transcript.layout":"Transcript layout","transcript.list":"List","transcript.grid":"Grid","transcript.copyMd":"Copy .md","transcript.saveFile":"Save file","transcript.exportMd":"Export .md","transcript.reviewPacket":"Review packet","transcript.packetWarning":"Review packets contain every captured answer in full, even when context was trimmed or excluded. Check for sensitive information before sharing. Trimming is not redaction.","transcript.hint":"The text here is the answer you captured. Trimming what's sent forward never alters this copy or the exports; it only changes what later models receive. Grid view lays answers side by side for honest comparison.","transcript.empty":"Nothing yet. Answers land here as you save them.","transcript.sentFull":"sent in full","transcript.excluded":"excluded from context","transcript.trimmed":"trimmed for context","transcript.round":"round {round}","transcript.blind":"blind","transcript.revision":"revision","transcript.ballot":"ballot","transcript.synthesis":"synthesis","transcript.ranked":"ranked {ranking}","transcript.notParsed":"ranking not parsed","transcript.stale":"⚠ an earlier turn was edited after this","transcript.review":"⚠ original changed, re-check what's forwarded","transcript.save":"Save","transcript.resetFull":"Reset to full","transcript.exclude":"Exclude entirely","transcript.cancel":"Cancel","transcript.curateNote":"This only changes what later models receive. The original above is preserved in the transcript and exports, so this is not a way to redact sensitive text.","transcript.editForward":"Edit what's sent forward",
-  "lane.lap":"LAP {round}","lane.debate":"ANSWER","lane.blind":"BLIND","lane.revise":"REVISE","lane.ballot":"BALLOT","lane.synth":"SYNTHESIS","lane.now":"▸ NOW","lane.progress":"Relay progress: turn {current} of {total}{now}","lane.nowName":", now {name}",
+  "transcript.filters":"Filter turns","transcript.filterParticipant":"Participant","transcript.allParticipants":"All participants","transcript.filterKind":"Turn type","transcript.allKinds":"All turn types","transcript.filterRound":"Round","transcript.allRounds":"All rounds","transcript.filterState":"State","transcript.allStates":"All states","transcript.filterStale":"Stale","transcript.filterReview":"Needs review","transcript.filterExcluded":"Excluded","transcript.filterTrimmed":"Trimmed","transcript.filterRanked":"Ranked","transcript.filterText":"Text match","transcript.filterPlaceholder":"Search captured text and labels","transcript.clearFilters":"Clear filters","transcript.showingAll":"Saved turns shown: {total} of {total}.","transcript.showingFiltered":"Saved turns shown: {visible} of {total}. Hidden by filters: {hidden}.","transcript.noMatches":"No saved turns match these filters.",
+  "lane.navigation":"Relay turn navigation","lane.station":"Turn {current} of {total}: {name}, {kind}. {status}","lane.stationCurrent":"Current turn","lane.stationAvailable":"Available","lane.stationFuture":"Not available yet","lane.lap":"LAP {round}","lane.debate":"ANSWER","lane.blind":"BLIND","lane.revise":"REVISE","lane.ballot":"BALLOT","lane.synth":"SYNTHESIS","lane.now":"▸ NOW","lane.progress":"Relay progress: turn {current} of {total}{now}","lane.nowName":", now {name}",
   "counter.text":"{chars} chars · ~{tokens} tokens (rough). Longer transcripts cost more each turn.","counter.warning":" ⚠ This is getting long; consider trimming earlier answers in the transcript.",
   "stats.synthesis":"Synthesis","stats.line":"{name}: {answers} · {chars} chars · ~{tokens} tokens","stats.peer":"Peer ranking: {ranking} ({ballots})","stats.total":"Total captured: {chars} chars · ~{tokens} tokens",
   "common.model":"Model {number}","common.modelFallback":"Model","common.answer.one":"1 answer","common.answer.other":"{count} answers","common.ballot.one":"1 ballot","common.ballot.other":"{count} ballots",
@@ -742,7 +768,8 @@ const FR={
   "done.heading":"Relais terminé","done.download":"Télécharger la transcription (.md)","done.copyFinal":"Copier la réponse finale","done.reopen":"Rouvrir le dernier tour","done.restart":"Nouveau relais","done.none":"Aucune réponse enregistrée. Rouvrez un tour ou recommencez.","done.withSynth":"{answers} et une synthèse enregistrées. Téléchargez-les ou poursuivez.","done.withoutSynth":"{answers} enregistrées. Téléchargez la transcription ou poursuivez.",
   "score.heading":"Classement croisé","score.note":"Décompte de Borda des classements collés par les modèles : avec n réponses, la 1re place rapporte n−1 points et la dernière 0. Seuls les votes confirmés comptent.","score.point.one":"{points} pt","score.point.other":"{points} pts",
   "transcript.heading":"Transcription","transcript.layout":"Disposition de la transcription","transcript.list":"Liste","transcript.grid":"Grille","transcript.copyMd":"Copier le .md","transcript.saveFile":"Enregistrer le fichier","transcript.exportMd":"Exporter en .md","transcript.reviewPacket":"Dossier de révision","transcript.packetWarning":"Les dossiers de révision contiennent chaque réponse capturée en entier, même si le contexte a été réduit ou exclu. Vérifiez les données sensibles avant tout partage. Réduire ne signifie pas retirer.","transcript.hint":"Le texte affiché est la réponse capturée. Réduire ce qui est transmis ne modifie jamais cette copie ni les exports ; cela change seulement ce que reçoivent les modèles suivants. La grille place les réponses côte à côte pour une comparaison honnête.","transcript.empty":"Rien pour l’instant. Les réponses apparaîtront ici à mesure que vous les enregistrerez.","transcript.sentFull":"transmis en entier","transcript.excluded":"exclu du contexte","transcript.trimmed":"réduit pour le contexte","transcript.round":"manche {round}","transcript.blind":"à l’aveugle","transcript.revision":"révision","transcript.ballot":"vote","transcript.synthesis":"synthèse","transcript.ranked":"classé {ranking}","transcript.notParsed":"classement non détecté","transcript.stale":"⚠ un tour antérieur a été modifié après ceci","transcript.review":"⚠ original modifié, revérifier le contenu transmis","transcript.save":"Enregistrer","transcript.resetFull":"Rétablir la version entière","transcript.exclude":"Exclure entièrement","transcript.cancel":"Annuler","transcript.curateNote":"Cela modifie uniquement ce que reçoivent les modèles suivants. L’original ci-dessus est conservé dans la transcription et les exports : cette fonction ne permet donc pas de retirer des données sensibles.","transcript.editForward":"Modifier ce qui est transmis",
-  "lane.lap":"MANCHE {round}","lane.debate":"RÉPONSE","lane.blind":"AVEUGLE","lane.revise":"RÉVISION","lane.ballot":"VOTE","lane.synth":"SYNTHÈSE","lane.now":"▸ ACTUEL","lane.progress":"Progression du relais : tour {current} sur {total}{now}","lane.nowName":", maintenant {name}",
+  "transcript.filters":"Filtrer les tours","transcript.filterParticipant":"Participant","transcript.allParticipants":"Tous les participants","transcript.filterKind":"Type de tour","transcript.allKinds":"Tous les types","transcript.filterRound":"Manche","transcript.allRounds":"Toutes les manches","transcript.filterState":"État","transcript.allStates":"Tous les états","transcript.filterStale":"Obsolète","transcript.filterReview":"À revérifier","transcript.filterExcluded":"Exclu","transcript.filterTrimmed":"Réduit","transcript.filterRanked":"Classé","transcript.filterText":"Correspondance textuelle","transcript.filterPlaceholder":"Rechercher dans le texte capturé et les libellés","transcript.clearFilters":"Effacer les filtres","transcript.showingAll":"Tours enregistrés affichés : {total} sur {total}.","transcript.showingFiltered":"Tours enregistrés affichés : {visible} sur {total}. Masqués par les filtres : {hidden}.","transcript.noMatches":"Aucun tour enregistré ne correspond à ces filtres.",
+  "lane.navigation":"Navigation entre les tours du relais","lane.station":"Tour {current} sur {total} : {name}, {kind}. {status}","lane.stationCurrent":"Tour actuel","lane.stationAvailable":"Disponible","lane.stationFuture":"Pas encore disponible","lane.lap":"MANCHE {round}","lane.debate":"RÉPONSE","lane.blind":"AVEUGLE","lane.revise":"RÉVISION","lane.ballot":"VOTE","lane.synth":"SYNTHÈSE","lane.now":"▸ ACTUEL","lane.progress":"Progression du relais : tour {current} sur {total}{now}","lane.nowName":", maintenant {name}",
   "counter.text":"{chars} caractères · ~{tokens} jetons (estimation). Les longues transcriptions coûtent davantage à chaque tour.","counter.warning":" ⚠ Cela devient long ; envisagez de réduire des réponses précédentes dans la transcription.",
   "stats.synthesis":"Synthèse","stats.line":"{name} : {answers} · {chars} caractères · ~{tokens} jetons","stats.peer":"Classement croisé : {ranking} ({ballots})","stats.total":"Total capturé : {chars} caractères · ~{tokens} jetons",
   "common.model":"Modèle {number}","common.modelFallback":"Modèle","common.answer.one":"1 réponse","common.answer.other":"{count} réponses","common.ballot.one":"1 vote","common.ballot.other":"{count} votes",
@@ -802,7 +829,8 @@ const ES={
   "done.heading":"Relevo completado","done.download":"Descargar transcripción (.md)","done.copyFinal":"Copiar respuesta final","done.reopen":"Reabrir último turno","done.restart":"Nuevo relevo","done.none":"Todavía no hay respuestas guardadas. Reabre un turno o empieza de nuevo.","done.withSynth":"Se guardaron {answers} y una síntesis. Descárgalas o continúa.","done.withoutSynth":"Se guardaron {answers}. Descarga la transcripción o continúa.",
   "score.heading":"Clasificación entre pares","score.note":"Recuento Borda de las clasificaciones pegadas por los modelos: con n respuestas, el primer puesto recibe n−1 puntos y el último 0. Solo cuentan los votos confirmados.","score.point.one":"{points} pto","score.point.other":"{points} ptos",
   "transcript.heading":"Transcripción","transcript.layout":"Diseño de la transcripción","transcript.list":"Lista","transcript.grid":"Cuadrícula","transcript.copyMd":"Copiar .md","transcript.saveFile":"Guardar archivo","transcript.exportMd":"Exportar .md","transcript.reviewPacket":"Paquete de revisión","transcript.packetWarning":"Los paquetes de revisión contienen cada respuesta capturada completa, incluso cuando el contexto se recortó o excluyó. Comprueba si hay información sensible antes de compartir. Recortar no equivale a eliminar.","transcript.hint":"El texto mostrado es la respuesta capturada. Recortar lo que se transmite nunca modifica esta copia ni las exportaciones. Solo cambia lo que reciben los modelos posteriores. La cuadrícula coloca las respuestas en paralelo para compararlas con honestidad.","transcript.empty":"Todavía no hay contenido. Las respuestas aparecerán aquí al guardarlas.","transcript.sentFull":"enviado completo","transcript.excluded":"excluido del contexto","transcript.trimmed":"recortado para el contexto","transcript.round":"ronda {round}","transcript.blind":"a ciegas","transcript.revision":"revisión","transcript.ballot":"votación","transcript.synthesis":"síntesis","transcript.ranked":"clasificado {ranking}","transcript.notParsed":"clasificación no detectada","transcript.stale":"⚠ se editó un turno anterior después de este","transcript.review":"⚠ cambió el original, revisa lo transmitido","transcript.save":"Guardar","transcript.resetFull":"Restablecer completo","transcript.exclude":"Excluir por completo","transcript.cancel":"Cancelar","transcript.curateNote":"Esto solo cambia lo que reciben los modelos posteriores. El original anterior se conserva en la transcripción y en las exportaciones, por lo que esta función no sirve para retirar texto sensible.","transcript.editForward":"Editar lo que se transmite",
-  "lane.lap":"RONDA {round}","lane.debate":"RESPUESTA","lane.blind":"A CIEGAS","lane.revise":"REVISIÓN","lane.ballot":"VOTACIÓN","lane.synth":"SÍNTESIS","lane.now":"▸ AHORA","lane.progress":"Progreso del relevo: turno {current} de {total}{now}","lane.nowName":", ahora {name}",
+  "transcript.filters":"Filtrar turnos","transcript.filterParticipant":"Participante","transcript.allParticipants":"Todos los participantes","transcript.filterKind":"Tipo de turno","transcript.allKinds":"Todos los tipos","transcript.filterRound":"Ronda","transcript.allRounds":"Todas las rondas","transcript.filterState":"Estado","transcript.allStates":"Todos los estados","transcript.filterStale":"Desactualizado","transcript.filterReview":"Requiere revisión","transcript.filterExcluded":"Excluido","transcript.filterTrimmed":"Recortado","transcript.filterRanked":"Clasificado","transcript.filterText":"Coincidencia de texto","transcript.filterPlaceholder":"Buscar en el texto capturado y las etiquetas","transcript.clearFilters":"Borrar filtros","transcript.showingAll":"Turnos guardados mostrados: {total} de {total}.","transcript.showingFiltered":"Turnos guardados mostrados: {visible} de {total}. Ocultos por los filtros: {hidden}.","transcript.noMatches":"Ningún turno guardado coincide con estos filtros.",
+  "lane.navigation":"Navegación por los turnos del relevo","lane.station":"Turno {current} de {total}: {name}, {kind}. {status}","lane.stationCurrent":"Turno actual","lane.stationAvailable":"Disponible","lane.stationFuture":"Aún no disponible","lane.lap":"RONDA {round}","lane.debate":"RESPUESTA","lane.blind":"A CIEGAS","lane.revise":"REVISIÓN","lane.ballot":"VOTACIÓN","lane.synth":"SÍNTESIS","lane.now":"▸ AHORA","lane.progress":"Progreso del relevo: turno {current} de {total}{now}","lane.nowName":", ahora {name}",
   "counter.text":"{chars} caracteres · ~{tokens} tokens (estimación). Las transcripciones largas cuestan más en cada turno.","counter.warning":" ⚠ El contenido se está alargando. Considera recortar respuestas anteriores en la transcripción.",
   "stats.synthesis":"Síntesis","stats.line":"{name}: {answers} · {chars} caracteres · ~{tokens} tokens","stats.peer":"Clasificación entre pares: {ranking} ({ballots})","stats.total":"Total capturado: {chars} caracteres · ~{tokens} tokens",
   "common.model":"Modelo {number}","common.modelFallback":"Modelo","common.answer.one":"1 respuesta","common.answer.other":"{count} respuestas","common.ballot.one":"1 voto","common.ballot.other":"{count} votos",
@@ -1684,35 +1712,68 @@ function turnTarget(t){
 }
 const KIND_LAP={debate:"lane.debate",blind:"lane.blind",revise:"lane.revise",ballot:"lane.ballot",synth:"lane.synth"};
 function displayTurnName(turn){ return turn.kind==="synth"&&!turn.pid?t("stats.synthesis"):turn.name; }
+function turnTypeLabel(kind){ return tr(uiLocale,STEP_KINDS[kind]||STEP_KINDS.debate); }
+let laneStateRef=null, laneReachThrough=-1;
+function syncLaneReach(){
+  if(!state||!Array.isArray(state.turns)){ laneStateRef=null; laneReachThrough=-1; return; }
+  const last=state.turns.length-1;
+  const current=Math.min(Math.max(0,state.cursor),last);
+  const answered=(state.answers||[]).reduce((highest,answer,i)=>cleanText(answer).trim()?Math.max(highest,i):highest,-1);
+  if(laneStateRef!==state){ laneStateRef=state; laneReachThrough=Math.max(current,answered); }
+  else laneReachThrough=Math.max(laneReachThrough,current,answered);
+}
+function canNavigateToTurn(index){
+  if(!state||!Array.isArray(state.turns)||!Number.isInteger(index)||index<0||index>=state.turns.length) return false;
+  syncLaneReach();
+  if(index<=laneReachThrough) return true;
+  return !!cleanText(state.answers&&state.answers[index]).trim();
+}
+function navigateLaneToTurn(index){
+  if(!canNavigateToTurn(index)||(index===state.cursor&&!state.ended)) return false;
+  state.cursor=index; state.ended=false; renderTurn(); return true;
+}
 function renderLane(){
   const lane=$("lane"); lane.innerHTML="";
+  syncLaneReach();
   const isDebate=state.recipe==="debate";
   state.turns.forEach((turn,i)=>{
     const done=(state.answers[i]||"").trim()!=="" || i<state.cursor;
     const active=i===state.cursor;
     const prev=i>0?state.turns[i-1]:null;
     const lapStart=(i===0)||(prev&&(prev.kind!==turn.kind||(turn.kind==="debate"&&prev.round!==turn.round)));
-    const st=document.createElement("div");
+    const st=document.createElement("button"); st.type="button";
     st.className="station"+(active?" active":"")+(done?" done":"");
     st.style.color=safeColor(turn.color);
-    const bar=document.createElement("div"); bar.className="bar"+(i<state.cursor?" lit":"");
+    const available=canNavigateToTurn(i);
+    st.disabled=!available;
+    const kind=turnTypeLabel(turn.kind);
+    const status=active?t("lane.stationCurrent"):available?t("lane.stationAvailable"):t("lane.stationFuture");
+    st.setAttribute("aria-label",t("lane.station",{current:i+1,total:state.turns.length,name:displayTurnName(turn),kind,status}));
+    if(active) st.setAttribute("aria-current","step");
+    st.onclick=()=>navigateLaneToTurn(i);
+    st.onkeydown=event=>{ if(["Enter"," ","Spacebar"].includes(event.key)){ event.preventDefault(); navigateLaneToTurn(i); } };
+    const bar=document.createElement("div"); bar.className="bar"+(i<state.cursor?" lit":""); bar.setAttribute("aria-hidden","true");
     st.appendChild(bar);
     if(lapStart){
-      const lap=document.createElement("div"); lap.className="lap";
+      const lap=document.createElement("div"); lap.className="lap"; lap.setAttribute("aria-hidden","true");
       lap.textContent=(isDebate&&turn.kind==="debate")?t("lane.lap",{round:turn.round}):tr(uiLocale,KIND_LAP[turn.kind]||"lane.debate");
       st.appendChild(lap);
     }
-    const node=document.createElement("div"); node.className="node"+(done?" done":"")+(active?" active":"");
+    const node=document.createElement("div"); node.className="node"+(done?" done":"")+(active?" active":""); node.setAttribute("aria-hidden","true");
     st.appendChild(node);
-    const nm=document.createElement("div"); nm.className="nm"; nm.textContent=displayTurnName(turn); st.appendChild(nm);
-    if(active){ const now=document.createElement("span"); now.className="now"; now.textContent=t("lane.now"); st.appendChild(now); }
+    const nm=document.createElement("div"); nm.className="nm"; nm.textContent=displayTurnName(turn); nm.setAttribute("aria-hidden","true"); st.appendChild(nm);
+    if(active){ const now=document.createElement("span"); now.className="now"; now.textContent=t("lane.now"); now.setAttribute("aria-hidden","true"); st.appendChild(now); }
     lane.appendChild(st);
   });
   const cur=Math.min(state.cursor+1,state.turns.length);
   const now=state.cursor<state.turns.length?t("lane.nowName",{name:displayTurnName(state.turns[state.cursor])}):"";
   lane.setAttribute("aria-label",t("lane.progress",{current:cur,total:state.turns.length,now}));
   const active=lane.querySelector(".station.active");
-  if(active && lane.scrollTo){ const target=active.offsetLeft-(lane.clientWidth/2)+(active.offsetWidth/2); lane.scrollTo({left:Math.max(0,target),behavior:"smooth"}); }
+  if(active && lane.scrollTo){
+    const target=active.offsetLeft-(lane.clientWidth/2)+(active.offsetWidth/2);
+    const reduced=typeof window.matchMedia==="function"&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    lane.scrollTo({left:Math.max(0,target),behavior:reduced?"auto":"smooth"});
+  }
 }
 function contextBadge(i){
   const f=state.forward[i];
@@ -1721,14 +1782,78 @@ function contextBadge(i){
   return {t:t("transcript.trimmed"),c:"trim"};
 }
 const KIND_RD={debate:r=>t("transcript.round",{round:r}),blind:()=>t("transcript.blind"),revise:()=>t("transcript.revision"),ballot:()=>t("transcript.ballot"),synth:()=>t("transcript.synthesis")};
+const EMPTY_TRANSCRIPT_FILTERS=Object.freeze({participant:"",kind:"",round:"",status:"",query:""});
+let transcriptFilters={...EMPTY_TRANSCRIPT_FILTERS};
+function normalizeTranscriptFilters(value){
+  const f=value&&typeof value==="object"?value:{};
+  const kind=Object.prototype.hasOwnProperty.call(STEP_KINDS,f.kind)?f.kind:"";
+  const status=["stale","review","excluded","trimmed","ranked"].includes(f.status)?f.status:"";
+  const round=/^[1-9][0-9]*$/.test(cleanText(f.round))?cleanText(f.round):"";
+  return {participant:cleanText(f.participant).slice(0,80),kind,round,status,query:cleanText(f.query).slice(0,500)};
+}
+function foldTranscriptText(value,locale=uiLocale){
+  return cleanText(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase(normalizeLocale(locale));
+}
+function transcriptTurnSearchText(i){
+  const turn=state.turns[i], answer=cleanText(state.answers[i]);
+  const labels=[displayTurnName(turn),turnTypeLabel(turn.kind),(KIND_RD[turn.kind]||KIND_RD.debate)(turn.round),answer];
+  if(turn.kind==="ballot"){
+    const rank=effectiveBallot(i);
+    labels.push(rank?t("transcript.ranked",{ranking:rank.join(" > ")}):t("transcript.notParsed"));
+  }else if(isQuotable(turn)) labels.push(contextBadge(i).t);
+  if(state.stale&&state.stale[i]) labels.push(t("transcript.stale"));
+  if(state.review&&state.review[i]) labels.push(t("transcript.review"));
+  return labels.join("\n");
+}
+function transcriptTurnMatches(i,filters=transcriptFilters){
+  if(!state||!state.turns[i]||!cleanText(state.answers[i]).trim()) return false;
+  const f=normalizeTranscriptFilters(filters), turn=state.turns[i], forward=state.forward&&state.forward[i];
+  if(f.participant&&turn.pid!==f.participant) return false;
+  if(f.kind&&turn.kind!==f.kind) return false;
+  if(f.round&&String(turn.round)!==f.round) return false;
+  if(f.status==="stale"&&!(state.stale&&state.stale[i])) return false;
+  if(f.status==="review"&&!(state.review&&state.review[i])) return false;
+  if(f.status==="excluded"&&!(isQuotable(turn)&&forward!=null&&!cleanText(forward).trim())) return false;
+  if(f.status==="trimmed"&&!(isQuotable(turn)&&forward!=null&&!!cleanText(forward).trim())) return false;
+  if(f.status==="ranked"&&!effectiveBallot(i)) return false;
+  return !f.query||foldTranscriptText(transcriptTurnSearchText(i)).includes(foldTranscriptText(f.query));
+}
+function transcriptFiltersActive(){ return Object.values(transcriptFilters).some(value=>cleanText(value).trim()!==""); }
+function setSelectOptions(select,options,value){
+  select.innerHTML="";
+  options.forEach(([optionValue,label])=>{ const option=document.createElement("option"); option.value=optionValue; option.textContent=label; select.appendChild(option); });
+  select.value=value;
+}
+function renderTranscriptFilterControls(total,visible){
+  setSelectOptions($("transcriptFilterParticipant"),[["",t("transcript.allParticipants")],...state.participants.map(p=>[p.id,p.name])],transcriptFilters.participant);
+  setSelectOptions($("transcriptFilterKind"),[["",t("transcript.allKinds")],...Object.keys(STEP_KINDS).map(kind=>[kind,turnTypeLabel(kind)])],transcriptFilters.kind);
+  const rounds=Array.from(new Set(state.turns.map(turn=>+turn.round).filter(round=>round>0))).sort((a,b)=>a-b);
+  setSelectOptions($("transcriptFilterRound"),[["",t("transcript.allRounds")],...rounds.map(round=>[String(round),t("transcript.round",{round})])],transcriptFilters.round);
+  setSelectOptions($("transcriptFilterState"),[["",t("transcript.allStates")],["stale",t("transcript.filterStale")],["review",t("transcript.filterReview")],["excluded",t("transcript.filterExcluded")],["trimmed",t("transcript.filterTrimmed")],["ranked",t("transcript.filterRanked")]],transcriptFilters.status);
+  if($("transcriptFilterQuery").value!==transcriptFilters.query) $("transcriptFilterQuery").value=transcriptFilters.query;
+  const active=transcriptFiltersActive(), hidden=total-visible;
+  $("transcriptFilterClear").disabled=!active;
+  $("transcriptFilterStatus").textContent=active?t("transcript.showingFiltered",{visible,total,hidden}):t("transcript.showingAll",{total});
+}
+function readTranscriptFilterControls(){
+  return normalizeTranscriptFilters({participant:$("transcriptFilterParticipant").value,kind:$("transcriptFilterKind").value,round:$("transcriptFilterRound").value,status:$("transcriptFilterState").value,query:$("transcriptFilterQuery").value});
+}
+function setTranscriptFilters(value){ transcriptFilters=normalizeTranscriptFilters(value); if(state) renderTranscript(); return transcriptFilters; }
+[$("transcriptFilterParticipant"),$("transcriptFilterKind"),$("transcriptFilterRound"),$("transcriptFilterState")].forEach(control=>control.onchange=()=>setTranscriptFilters(readTranscriptFilterControls()));
+$("transcriptFilterQuery").addEventListener("input",()=>setTranscriptFilters(readTranscriptFilterControls()));
+$("transcriptFilterClear").onclick=()=>setTranscriptFilters(EMPTY_TRANSCRIPT_FILTERS);
 function renderTranscript(){
   const tc=$("transcript");
-  const any=state.answers.some(a=>(a||"").trim());
-  if(!any){tc.innerHTML="";const empty=document.createElement("p");empty.className="empty";empty.textContent=t("transcript.empty");tc.appendChild(empty);return;}
+  const answered=state.answers.map((answer,i)=>cleanText(answer).trim()?i:-1).filter(i=>i>=0);
+  const visible=answered.filter(i=>transcriptTurnMatches(i));
+  renderTranscriptFilterControls(answered.length,visible.length);
+  if(!answered.length){tc.innerHTML="";const empty=document.createElement("p");empty.className="empty";empty.textContent=t("transcript.empty");tc.appendChild(empty);return;}
   tc.innerHTML="";
-  state.turns.forEach((turn,i)=>{
-    const a=(state.answers[i]||"").trim(); if(!a) return;
+  if(!visible.length){const empty=document.createElement("p");empty.className="empty";empty.textContent=t("transcript.noMatches");tc.appendChild(empty);return;}
+  visible.forEach(i=>{
+    const turn=state.turns[i], a=cleanText(state.answers[i]).trim();
     const d=document.createElement("div"); d.className="entry"; d.style.borderLeftColor=safeColor(turn.color);
+    d.setAttribute("data-turn-index",String(i));
     const eh=document.createElement("div"); eh.className="eh";
     const nm=document.createElement("span"); nm.className="nm"; nm.style.color=safeColor(turn.color); nm.textContent=displayTurnName(turn);
     const rd=document.createElement("span"); rd.className="rd"; rd.textContent=(KIND_RD[turn.kind]||KIND_RD.debate)(turn.round);
@@ -1845,7 +1970,7 @@ function renderTurn(focusAnswer=true){
 }
 
 /* ---------- start / nav ---------- */
-function beginState(s){ state=s; promptLocale=normalizeLocale(state.promptLocale||"en"); state.promptLocale=promptLocale; renderLanguageSelects(); $("runQuestion").textContent=state.question; $("setup").classList.add("hidden"); $("run").classList.remove("hidden"); $("resumeBar").classList.add("hidden"); openEditors.clear(); renderTurn(); }
+function beginState(s){ state=s; promptLocale=normalizeLocale(state.promptLocale||"en"); state.promptLocale=promptLocale; transcriptFilters={...EMPTY_TRANSCRIPT_FILTERS}; renderLanguageSelects(); $("runQuestion").textContent=state.question; $("setup").classList.add("hidden"); $("run").classList.remove("hidden"); $("resumeBar").classList.add("hidden"); openEditors.clear(); renderTurn(); }
 $("start").onclick=()=>{
   const q=$("question").value.trim(); if(!q){alert(t("alert.writeQuestion"));return;}
   const rounds=Math.max(1,Math.min(6,+$("rounds").value||1));

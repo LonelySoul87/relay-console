@@ -82,6 +82,7 @@ vm.createContext(sandbox);
 const exportsCode=`
 globalThis.__relayTest={
   parseBallot,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
+  foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
@@ -123,6 +124,9 @@ function descendants(root){
   const out=[];
   for(const child of root.children||[]){out.push(child,...descendants(child));}
   return out;
+}
+function renderedTurnIndexes(){
+  return document.getElementById("transcript").children.filter(el=>el.classList.contains("entry")).map(el=>+el.getAttribute("data-turn-index"));
 }
 
 test("v2.4 draft JavaScript loads in a minimal browser environment",()=>{
@@ -802,9 +806,18 @@ test("important visible controls have accessible labels",()=>{
   for(const id of ["uiLocale","promptLocale","question","recipeSel","rounds","synthPick","format","presetSelect","promptBox","answer"]){
     assert.match(html,new RegExp(`<label[^>]*for=["']${id}["']`),id);
   }
+  for(const id of ["transcriptFilterParticipant","transcriptFilterKind","transcriptFilterRound","transcriptFilterState","transcriptFilterQuery"]){
+    assert.match(html,new RegExp(`<label[^>]*>[^\\n]*id=["']${id}["'][^\\n]*<\\/label>`),id);
+  }
   assert.match(html,/t\("plan\.removeStep"/);
   assert.match(html,/t\("participants\.remove"/);
   assert.match(html,/data-i18n-aria="turn\.promptAria"/);
+  assert.match(html,/id="transcriptFilterStatus" role="status" aria-live="polite" aria-atomic="true"/);
+  assert.match(html,/id="lane" role="navigation"[^>]*data-i18n-aria="lane\.navigation"/);
+  assert.match(html,/st\.onkeydown=event=>\{ if\(\["Enter"," ","Spacebar"\]/);
+  assert.match(html,/@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(html,/behavior:reduced\?"auto":"smooth"/);
+  assert.match(html,/@media \(max-width:430px\)\{\.filtergrid\{grid-template-columns:1fr\}/);
 });
 
 test("session language metadata is preserved and older sessions default prompts to English",()=>{
@@ -836,6 +849,102 @@ test("Spanish transcript export localizes app labels without changing captured a
   assert.match(md,/\*\*Pregunta:\*\* QUESTION-RAW/);
   assert.match(md,/CAPTURED-VERBATIM/);
   app.setState(null);app.setUiLocale("en");
+});
+
+test("transcript attribute filters report hidden turns honestly and never alter captured answers",()=>{
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"debate"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"revise"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"Reviewer",round:3,kind:"ballot"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  const s=stateFor(turns,ps,["ALPHA-FULL","BETA-FULL","ALPHA-REVISION","RANKING: B > A","FINAL"]);
+  s.forward[0]="";s.forward[1]="BETA-TRIMMED";s.stale[2]=true;s.review[1]=true;s.ballots[3]=["B","A"];s.cursor=4;
+  const captured=JSON.stringify(s.answers);
+  app.setState(s);app.setUiLocale("en",false);
+
+  app.setTranscriptFilters({participant:"p0"});
+  assert.deepEqual(renderedTurnIndexes(),[0,2]);
+  app.setTranscriptFilters({kind:"ballot"});
+  assert.deepEqual(renderedTurnIndexes(),[3]);
+  assert.equal(document.getElementById("transcriptFilterStatus").textContent,app.tr("en","transcript.showingFiltered",{visible:1,total:5,hidden:4}));
+  app.setTranscriptFilters({round:"1"});
+  assert.deepEqual(renderedTurnIndexes(),[0,1]);
+  app.setTranscriptFilters({});
+  document.getElementById("transcriptFilterState").value="stale";
+  document.getElementById("transcriptFilterState").onchange();
+  assert.deepEqual(renderedTurnIndexes(),[2]);
+  app.setTranscriptFilters({status:"review"});
+  assert.deepEqual(renderedTurnIndexes(),[1]);
+  app.setTranscriptFilters({status:"excluded"});
+  assert.deepEqual(renderedTurnIndexes(),[0]);
+  app.setTranscriptFilters({status:"trimmed"});
+  assert.deepEqual(renderedTurnIndexes(),[1]);
+  app.setTranscriptFilters({status:"ranked"});
+  assert.deepEqual(renderedTurnIndexes(),[3]);
+  assert.equal(JSON.stringify(s.answers),captured);
+
+  app.setTranscriptFilters({participant:"p0",kind:"revise",round:"2",status:"stale"});
+  assert.deepEqual(renderedTurnIndexes(),[2],"attribute filters combine rather than broadening each other");
+  document.getElementById("transcriptFilterClear").click();
+  assert.deepEqual(renderedTurnIndexes(),[0,1,2,3,4]);
+  assert.equal(document.getElementById("transcriptFilterClear").disabled,true);
+  assert.equal(JSON.stringify(s.answers),captured);
+  app.setState(null);app.setUiLocale("en",false);
+});
+
+test("transcript text matching folds French and Spanish accents and ranked filtering rejects invalid arrays",()=>{
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"revise"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"Reviewer",round:3,kind:"ballot"}
+  ];
+  const s=stateFor(turns,ps,["ONE","TWO","THREE","RANKING: B > A"]);s.ballots[3]=["B","A"];s.cursor=3;
+  const captured=JSON.stringify(s.answers);
+  app.setState(s);app.setUiLocale("fr",false);
+  document.getElementById("transcriptFilterQuery").value="REVISION";
+  document.getElementById("transcriptFilterQuery").dispatchEvent({type:"input"});
+  assert.deepEqual(renderedTurnIndexes(),[2],"revision finds the French révision label");
+  app.setUiLocale("es",false);s.ballots[3]=["A","A"];app.setTranscriptFilters({query:"CLASIFICACION"});
+  assert.deepEqual(renderedTurnIndexes(),[3],"clasificacion finds the Spanish clasificación label");
+  app.setTranscriptFilters({status:"ranked"});
+  assert.deepEqual(renderedTurnIndexes(),[],"a non-empty but invalid stored ranking is not ranked");
+  assert.equal(document.getElementById("transcript").children[0].textContent,app.tr("es","transcript.noMatches"));
+  assert.equal(JSON.stringify(s.answers),captured);
+  app.setState(null);app.setUiLocale("en",false);
+});
+
+test("lane stations navigate reached turns without changing answers and future stations stay inert",()=>{
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[0,1,2,3].map((i)=>({pid:ps[i%2].id,name:ps[i%2].name,color:ps[i%2].color,role:"",round:i+1,kind:"debate"}));
+  const s=stateFor(turns,ps,["SAVED","","",""]);s.cursor=2;s.ended=false;s.draftAnswers[2]="UNSAVED-DRAFT";
+  const captured=JSON.stringify(s.answers);
+  app.setState(s);document.getElementById("answer").value="UNSAVED-DRAFT";app.renderLane();
+  const stations=document.getElementById("lane").children;
+  assert.equal(stations.length,4);
+  assert.ok(stations.every(station=>station.tagName==="BUTTON"),"native buttons provide mouse and keyboard activation");
+  assert.equal(stations[0].disabled,false);
+  assert.equal(stations[2].getAttribute("aria-current"),"step");
+  assert.equal(stations[3].disabled,true);
+  assert.equal(app.canNavigateToTurn(-1),false);
+  assert.equal(app.canNavigateToTurn(4),false);
+  stations[3].click();
+  assert.equal(s.cursor,2,"a disabled future station is inert even if its handler is invoked");
+  stations[0].click();
+  assert.equal(s.cursor,0);
+  assert.equal(JSON.stringify(s.answers),captured);
+  assert.equal(app.canNavigateToTurn(2),true,"the prior high-water turn remains reachable after jumping back");
+  let prevented=false;
+  stations[2].onkeydown({key:"Enter",preventDefault(){prevented=true;}});
+  assert.equal(prevented,true);
+  assert.equal(s.cursor,2);
+  assert.equal(document.getElementById("answer").value,"UNSAVED-DRAFT");
+  assert.equal(JSON.stringify(s.answers),captured);
+  app.setState(null);
 });
 
 /* ---------- bounded recovery checkpoint and autosave confidence (v2.4) ----------
