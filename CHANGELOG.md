@@ -3,8 +3,32 @@
 ## v2.4.0 draft
 
 Development draft focused on safer file workflows, faster navigation, recovery,
-accessibility, and deeper everyday polish. The final scope remains under joint
-ChatGPT and Claude review.
+accessibility, and deeper everyday polish. The release theme is **Nothing is
+lost by accident**.
+
+### Added
+
+- **Import review before apply.** Session files and portable preset bundles are
+  validated and summarized before any active relay or local preset data changes.
+- **Session import details.** The review shows version, participants, turns,
+  captured-answer count, current position, plan, interface language, and prompt
+  language.
+- **Preset normalization warnings.** The review lists collision-safe renames,
+  removed non-web URLs, and roles shortened to the existing safety limit.
+
+### Fixed and hardened
+
+- Ballot dropdowns rebuilt after an earlier answer is removed now write only the
+  labels visible in the rebuilt ballot.
+- A manual ballot always offers direct re-parsing, even when its saved ranking no
+  longer matches the available answer labels.
+- The tally, transcript badge, Markdown transcript, and review packet now share
+  one definition of a valid effective ballot.
+- Discarding the saved relay from the resume bar now requires confirmation.
+- Changing the interface language during a relay keeps keyboard focus on the
+  language selector instead of moving it to the answer field.
+- Import previews render selected-file content only as text. Previewing does not
+  mutate the active relay or storage, and applying presets performs one write.
 
 ## v2.3.0
 

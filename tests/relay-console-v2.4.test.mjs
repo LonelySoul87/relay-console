@@ -25,7 +25,7 @@ class FakeClassList{
 class FakeElement{
   constructor(tag="div",id=""){
     this.tagName=tag.toUpperCase();this.id=id;this.children=[];this.style={};this.classList=new FakeClassList();
-    this.value="";this.checked=false;this.disabled=false;this.textContent="";this.dataset={};this.attributes={};
+    this.value="";this.checked=false;this.disabled=false;this.textContent="";this.dataset={};this.attributes={};this.open=false;this.focusCount=0;
     this.offsetLeft=0;this.offsetWidth=0;this.clientWidth=0;this.parentNode=null;this.files=[];this.listeners={};
   }
   set innerHTML(value){this._innerHTML=String(value);this.children=[];}
@@ -42,10 +42,12 @@ class FakeElement{
   dispatchEvent(event){const value=event||{};if(!value.target)value.target=this;(this.listeners[value.type]||[]).forEach(handler=>handler.call(this,value));return true;}
   querySelector(){return null;}
   querySelectorAll(){return [];}
-  focus(){}
+  focus(){this.focusCount++;}
   select(){}
   click(){if(typeof this.onclick==="function")this.onclick({target:this});}
   scrollTo(){}
+  showModal(){this.open=true;this.setAttribute("open","");}
+  close(){this.open=false;this.removeAttribute("open");}
 }
 
 const elements=new Map();
@@ -77,9 +79,9 @@ const sandbox={
 vm.createContext(sandbox);
 const exportsCode=`
 globalThis.__relayTest={
-  parseBallot,isExactRanking,ballotTally,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
+  parseBallot,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
-  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,
+  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
@@ -97,13 +99,18 @@ function samplePreset(overrides={}){
     ],recipe:"dcr",customSteps:[{pi:0,kind:"blind",role:"",roleKey:"drafter"}],rounds:2,closing:true,format:"markdown",promptLocale:"fr",...overrides
   };
 }
-function presetBundle(presets){return {kind:"relay-console-presets",formatVersion:1,app:"2.3.0-draft",exported:"2026-08-28T00:00:00.000Z",presets};}
+function presetBundle(presets){return {kind:"relay-console-presets",formatVersion:1,app:"2.4.0-draft",exported:"2026-08-28T00:00:00.000Z",presets};}
 function stateFor(turns,participants,answers){
   return {
-    version:"2.3.0-draft",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
+    version:"2.4.0-draft",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
     participants,turns,synthPid:null,answers,forward:turns.map(()=>null),stale:turns.map(()=>false),prompts:turns.map(()=>null),
     promptStale:turns.map(()=>false),draftAnswers:turns.map(()=>null),review:turns.map(()=>false),ballots:turns.map(()=>null),ballotManual:turns.map(()=>false),cursor:0,ended:false,ts:1
   };
+}
+function descendants(root){
+  const out=[];
+  for(const child of root.children||[]){out.push(child,...descendants(child));}
+  return out;
 }
 
 test("v2.4 draft JavaScript loads in a minimal browser environment",()=>{
@@ -118,6 +125,8 @@ test("v2.4 draft JavaScript loads in a minimal browser environment",()=>{
   assert.match(html,/registerLocale\("es","Español",ES\)/);
   assert.match(html,/data-starter="dcr"/);
   assert.match(html,/el\.innerHTML=t\(el\.dataset\.i18nHtml/);
+  const contentWrites=[...html.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(match=>match[1].trim()).filter(value=>value!=="\"\"");
+  assert.deepEqual(contentWrites,["t(el.dataset.i18nHtml,{version:VERSION})"]);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
 });
 
@@ -354,6 +363,44 @@ test("Borda tally counts only exact permutations",()=>{
   assert.equal(tally.rows[0].pts,2);
 });
 
+test("invalidated ballots are reported honestly and remain directly recoverable",()=>{
+  const ps=[participant("p0","A"),participant("p1","B"),participant("p2","C")];
+  const turns=ps.map(p=>({pid:p.id,name:p.name,color:p.color,role:"",round:1,kind:"blind"}));
+  turns.push({pid:"p0",name:"A",color:"#10a37f",role:"Reviewer",round:2,kind:"ballot"});
+  const s=stateFor(turns,ps,["one","two","","RANKING: B > A"]);s.cursor=3;s.ballots[3]=["C","A","B"];s.ballotManual[3]=true;
+  app.setState(s);
+  assert.equal(app.effectiveBallot(3),null);
+  assert.equal(app.ballotTally(),null);
+  const transcript=app.transcriptMd();
+  assert.match(transcript,/no ranking parsed/i);
+  assert.doesNotMatch(transcript,/parsed ranking: C > A > B/i);
+  const packet=app.reviewPacketMd("RPBALLOT123");
+  assert.doesNotMatch(packet,/ranked C > A > B/i);
+  app.renderTranscript();
+  const voteBadge=descendants(document.getElementById("transcript")).find(el=>el.classList.contains("vote"));
+  assert.equal(voteBadge.textContent,app.tr("en","transcript.notParsed"));
+  app.renderBallotBox();
+  let controls=document.getElementById("ballotRanks").children;
+  const reparse=controls.at(-1);
+  assert.equal(reparse.textContent,app.tr("en","ballot.reparse"));
+  document.getElementById("answer").value="RANKING: B > A";
+  reparse.onclick();
+  assert.deepEqual(plain(s.ballots[3]),["B","A"]);
+  assert.deepEqual(plain(app.effectiveBallot(3)),["B","A"]);
+});
+
+test("a ballot dropdown rebuilt after answer removal writes only the rendered labels",()=>{
+  const ps=[participant("p0","A"),participant("p1","B"),participant("p2","C")];
+  const turns=ps.map(p=>({pid:p.id,name:p.name,color:p.color,role:"",round:1,kind:"blind"}));
+  turns.push({pid:"p0",name:"A",color:"#10a37f",role:"Reviewer",round:2,kind:"ballot"});
+  const s=stateFor(turns,ps,["one","two","","RANKING: B > A"]);s.cursor=3;s.ballots[3]=["C","A","B"];s.ballotManual[3]=true;
+  app.setState(s);app.renderBallotBox();
+  const firstSelect=document.getElementById("ballotRanks").children.find(el=>el.tagName==="SELECT");
+  firstSelect.value="B";firstSelect.onchange();
+  assert.deepEqual(plain(s.ballots[3]),["B","A"]);
+  assert.deepEqual(plain(app.effectiveBallot(3)),["B","A"]);
+});
+
 test("changing a ballot marks an existing synthesis and edited prompt stale",()=>{
   const ps=[participant("p0","A"),participant("p1","B")];
   const turns=[
@@ -424,6 +471,72 @@ test("import replacement guard recognizes first-turn and completed work",()=>{
   assert.equal(app.sessionHasMeaningfulWork({question:"",cursor:0,ended:false,draftAnswers:["draft"]}),true);
   assert.equal(app.sessionHasMeaningfulWork({question:"",cursor:0,ended:true,answers:[]}),true);
   assert.equal(app.sessionHasMeaningfulWork(null),false);
+});
+
+test("discarding the saved resume requires confirmation",()=>{
+  const saved={question:"Keep this",turns:[{kind:"blind"}],answers:["answer"]};
+  app.Store.save(saved);document.getElementById("resumeBar").classList.remove("hidden");
+  app.setConfirmReply(false);
+  assert.equal(document.getElementById("discardBtn").onclick(),false);
+  assert.deepEqual(plain(app.Store.load()),saved);
+  app.setConfirmReply(true);
+  assert.equal(document.getElementById("discardBtn").onclick(),true);
+  assert.equal(app.Store.load(),null);
+  assert.equal(document.getElementById("resumeBar").classList.contains("hidden"),true);
+});
+
+test("changing the interface language during a relay preserves keyboard focus",()=>{
+  const ps=[participant("p0","A"),participant("p1","B")];
+  const turns=[{pid:"p0",name:"A",color:"#10a37f",role:"",round:1,kind:"blind"}];
+  const s=stateFor(turns,ps,[""]);app.setState(s);
+  const answer=document.getElementById("answer");answer.focusCount=0;
+  app.setUiLocale("fr",false);
+  assert.equal(answer.focusCount,0);
+  app.renderTurn();
+  assert.equal(answer.focusCount,1);
+  app.setState(null);app.setUiLocale("en",false);
+});
+
+test("import descriptions validate and summarize sessions without mutating state",()=>{
+  const raw={version:"2.1.0",question:"Imported question",recipe:"blind",uiLocale:"fr",promptLocale:"es",participants:[participant("p0","A"),participant("p1","B")],turns:[{pid:"p0",name:"A",kind:"blind"},{pid:"p1",name:"B",kind:"blind"}],answers:["answer",""] ,cursor:1};
+  const current={question:"Unsaved current relay",answers:["work"],cursor:0,ended:false};
+  app.setState(current);
+  const before=JSON.stringify(current);
+  const info=app.describeImport(raw,current,[]);
+  assert.equal(info.kind,"session");
+  assert.deepEqual(plain(info.summary),{version:"2.1.0",participants:2,turns:2,answered:1,current:2,recipe:"blind",uiLocale:"fr",promptLocale:"es",replaces:true});
+  assert.equal(JSON.stringify(current),before);
+  assert.equal(app.describeImport({nonsense:true},current,[]).kind,"unknown");
+  app.setState(null);
+});
+
+test("preset import preview exposes normalization and applies exactly once",()=>{
+  const existing=[app.validatePreset(samplePreset({name:"QA"}))];
+  const rawPreset=samplePreset({name:"qa",roster:[
+    {name:"<img onerror=1>",color:"#10a37f",url:"javascript:alert(1)",role:"R".repeat(125),roleSet:true},
+    {name:"Claude",color:"#d97757",url:"https://claude.ai",role:"Critic",roleSet:true}
+  ]});
+  app.Store.savePresets(existing);
+  const info=app.describeImport(presetBundle([rawPreset]),null,app.Store.loadPresets());
+  assert.equal(info.kind,"presets");
+  assert.equal(info.imported[0].name,"qa (2)");
+  assert.deepEqual(plain(info.warnings.map(w=>w.kind).sort()),["renamed","roleTruncated","urlDropped"]);
+  const before=JSON.stringify(app.Store.loadPresets());
+  app.renderImportPreview(info);
+  assert.equal(document.getElementById("importPreview").open,true);
+  assert.equal(JSON.stringify(app.Store.loadPresets()),before);
+  assert.match(document.getElementById("importPreviewItems").children[0].textContent,/qa \(2\)/);
+  assert.ok(document.getElementById("importPreviewWarningList").children.every(el=>el.tagName==="LI"));
+  assert.ok(document.getElementById("importPreviewItems").children.every(el=>el.tagName==="DIV"));
+  let writes=0;const originalSave=app.Store.savePresets;
+  app.Store.savePresets=value=>{writes++;return originalSave.call(app.Store,value);};
+  try{
+    assert.equal(app.applyPendingImport(),true);
+    assert.equal(writes,1);
+    assert.equal(app.Store.loadPresets().length,2);
+    assert.equal(app.Store.loadPresets()[1].name,"qa (2)");
+    assert.equal(document.getElementById("importPreview").open,false);
+  }finally{app.Store.savePresets=originalSave;app.Store.savePresets([]);}
 });
 
 test("preset save and delete keep question and answers out of the preset",()=>{
