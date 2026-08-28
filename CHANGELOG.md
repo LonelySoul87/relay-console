@@ -81,6 +81,10 @@ lost by accident**.
 - Typing a question or editing the roster no longer re-measures all of local
   storage on every keystroke.
 
+- The recovery banner now announces itself to assistive technology when it
+  arrives, and its Restore and Remove buttons carry names that say what they
+  act on.
+
 ### Privacy
 
 - Discarded or replaced work can now remain in local browser storage for up to

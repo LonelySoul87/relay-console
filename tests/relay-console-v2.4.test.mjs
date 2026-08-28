@@ -1376,6 +1376,42 @@ test("every deferred callback family runs cleanly, and visible timer outcomes oc
   storage.clear();
 });
 
+test("the recovery bar announces itself and names its actions",()=>{
+  // Unlike the resume bar, which only ever appears at page load, the recovery
+  // bar appears as a direct result of Restart, discard, or a replacing import.
+  // A banner that arrives mid-flow has to be announced, and its two generic
+  // verbs need context when read out of order.
+  storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
+  app.refreshRecoveryOffer(Date.now());        // clear any bar left visible by an earlier test
+  const bar=document.getElementById("recoveryBar");
+  const live=recoverableSession({question:"Work in progress"});
+  app.setState(live);app.Store.save(live);
+  assert.equal(bar.classList.contains("hidden"),true,"hidden before the destructive action");
+  app.setConfirmReply(true);
+  assert.equal(document.getElementById("restart").onclick(),true);
+  assert.equal(bar.classList.contains("hidden"),false,"the bar arrives from a user action");
+  assert.ok(document.getElementById("recoveryMsg").children.length>0);
+
+  // The message is the live region. The buttons stay outside it so a re-render
+  // does not re-announce their labels.
+  assert.match(html,/<span class="msg" id="recoveryMsg" role="status" aria-live="polite"><\/span>/);
+  assert.match(html,/id="recoveryRestore"[^>]*data-i18n-aria="recovery\.restoreAria"/);
+  assert.match(html,/id="recoveryRemove"[^>]*data-i18n-aria="recovery\.removeAria"/);
+  // The exact-match regex above already proves the live region is an empty span,
+  // so no control can sit inside it.
+
+  for(const locale of app.SUPPORTED_LOCALES){
+    for(const key of ["recovery.restoreAria","recovery.removeAria"]){
+      const value=app.I18N[locale][key];
+      assert.equal(typeof value,"string",locale+" "+key);
+      assert.ok(value.trim().length>0,locale+" "+key);
+      assert.notEqual(value,app.I18N[locale][key.replace("Aria","")],locale+" "+key+" must add context");
+      assert.doesNotMatch(value,/\u2014/,locale+" "+key);
+    }
+  }
+  storage.clear();app.setState(null);app.resetSaveStatus();
+});
+
 test("standalone privacy boundary remains intact",()=>{
   assert.match(html,/connect-src 'none'/);
   assert.doesNotMatch(html,/<script[^>]+src=/i);
