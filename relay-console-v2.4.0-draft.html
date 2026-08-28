@@ -987,7 +987,7 @@ function saveState(now){
 function savePref(k,v){ const p=Store.loadPrefs()||{}; p[k]=v; Store.savePrefs(p); scheduleStorageReport(); }
 
 /* ---------- recovery and storage surfaces ---------- */
-let recoveryOffer=null;
+let recoveryOffer=null, recoveryAnnouncementToken=null;
 function formatBytes(size){
   const n=Number.isFinite(size)?Math.max(0,size):0;
   if(n<1024) return t("storage.bytes",{count:n});
@@ -998,7 +998,13 @@ function renderRecoveryBar(){
   const bar=$("recoveryBar"); if(!bar) return;
   const msg=$("recoveryMsg");
   const status=$("recoveryStatus");
-  if(!recoveryOffer){ msg.innerHTML=""; if(status.textContent)status.textContent=""; bar.classList.add("hidden"); return; }
+  if(!recoveryOffer){
+    msg.innerHTML="";
+    if(status.textContent)status.textContent="";
+    recoveryAnnouncementToken=null;
+    bar.classList.add("hidden");
+    return;
+  }
   const {record,session,reason}=recoveryOffer;
   const question=cleanText(session.question).trim();
   const answered=session.answers.filter(a=>cleanText(a).trim()).length;
@@ -1014,7 +1020,11 @@ function renderRecoveryBar(){
   note.textContent=t("recovery.expiry",{when:new Date(recoveryExpiresAt(record)).toLocaleDateString(uiLocale)});
   msg.append(head,note);
   const announcement=head.textContent+" "+note.textContent;
-  if(status.textContent!==announcement)status.textContent=announcement;
+  const token=recoveryIdentity(record);
+  if(recoveryAnnouncementToken!==token||status.textContent!==announcement){
+    status.textContent=announcement;
+    recoveryAnnouncementToken=token;
+  }
   bar.classList.remove("hidden");
 }
 function refreshRecoveryOffer(now){

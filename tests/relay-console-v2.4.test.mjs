@@ -1407,6 +1407,33 @@ test("the recovery bar announces itself and names its actions",()=>{
   // region announces it again, so the guard in renderRecoveryBar has to hold.
   assert.equal(statusWrites,1,"the setup re-render must not touch the live region at all");
 
+  // Two different checkpoints can summarize to the same visible sentence when
+  // their reason, displayed timestamp, question, and answer count match. The
+  // second record still replaces real work and must produce a fresh mutation.
+  const sameStamp=Date.now();
+  const firstRecord=app.recoveryRecord(recoverableSession({
+    question:"Same summary",answers:["first captured body",""]
+  }),"restart",sameStamp);
+  const secondRecord=app.recoveryRecord(recoverableSession({
+    question:"Same summary",answers:["different captured body",""]
+  }),"restart",sameStamp);
+  assert.notEqual(JSON.stringify(firstRecord),JSON.stringify(secondRecord));
+  assert.equal(app.Store.saveRecovery(firstRecord),true);
+  app.refreshRecoveryOffer(sameStamp);
+  const sharedAnnouncement=status.textContent;
+  let replacementText=status.textContent,replacementWrites=0;
+  Object.defineProperty(status,"textContent",{
+    configurable:true,
+    get(){return replacementText;},
+    set(value){replacementWrites++;replacementText=String(value);}
+  });
+  try{
+    assert.equal(app.Store.saveRecovery(secondRecord),true);
+    app.refreshRecoveryOffer(sameStamp);
+  }finally{delete status.textContent;status.textContent=replacementText;}
+  assert.equal(status.textContent,sharedAnnouncement,"the user-facing summary stays identical");
+  assert.equal(replacementWrites,1,"a distinct checkpoint must still be announced");
+
   // The always-rendered status is outside the hidden visual banner, so it is
   // present in the accessibility tree before any message is injected.
   assert.match(html,/<span class="msg" id="recoveryMsg"><\/span>[\s\S]*?<\/div>\s*<\/div>\s*<span class="sr-only" id="recoveryStatus" role="status" aria-live="polite" aria-atomic="true"><\/span>/);

@@ -84,6 +84,8 @@ lost by accident**.
 - The recovery banner now announces itself to assistive technology when it
   arrives, and its Restore and Remove buttons carry names that say what they
   act on.
+- A replacement recovery checkpoint is announced even when its visible summary
+  happens to match the previous checkpoint.
 
 ### Privacy
 
