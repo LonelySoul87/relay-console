@@ -2,7 +2,7 @@
 
 ## v2.3.0
 
-Development release focused on portable workflows and safer independent review
+Feature release focused on portable workflows and safer independent review
 handoffs.
 
 ### Added
