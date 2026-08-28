@@ -842,7 +842,7 @@ test("Spanish transcript export localizes app labels without changing captured a
    Every expiry assertion below passes an explicit timestamp. Nothing here reads
    the real clock, so the suite cannot drift or flake with wall time. */
 const DAY=24*60*60*1000;
-const T0=1756339200000;                       // fixed reference instant for every recovery test
+const T0=1756339200000;                       // use only when the tested call also receives T0; UI handlers use the real clock
 function recoverableSession(overrides={}){
   const ps=[participant("p0","Alpha"),participant("p1","Beta")];
   const turns=[
@@ -1315,7 +1315,7 @@ test("the storage report is not recomputed on every keystroke",()=>{
   storage.clear();
 });
 
-test("every deferred callback still runs cleanly, and the preset status really clears",()=>{
+test("every deferred callback family runs cleanly, and visible timer outcomes occur",()=>{
   // The deterministic timer queue is the right call, but it also means nothing
   // executes the app's five other deferred callbacks any more. Drain them here
   // so a throwing callback cannot pass unnoticed, and assert the one visible
@@ -1343,18 +1343,35 @@ test("every deferred callback still runs cleanly, and the preset status really c
   assert.equal(status.textContent,"","the current timer clears the message");
   assert.equal(status.classList.contains("hidden"),true);
 
-  // Exercise the remaining deferred paths and drain everything that is pending.
+  // Create one callback from every other timer family: prompt-copy status,
+  // mini-copy reset, object-URL cleanup, and import-dialog focus return. Then
+  // add the preset clear and drain all five families together.
   sandbox.__timers.length=0;
-  app.download("audit.md","body","text/markdown");
-  app.miniCopy(document.getElementById("copyMdBtn"),"text","idle");
-  app.showPresetStatus("draining");
-  const pending=sandbox.__timers.slice();
-  assert.ok(pending.length>=2,"expected deferred callbacks to be queued, saw "+pending.length);
-  const failures=[];
-  for(const timer of pending){
-    try{ timer.callback(); }catch(err){ failures.push(timer.delay+"ms: "+(err&&err.message)); }
-  }
-  assert.deepEqual(failures,[],"no deferred callback may throw");
+  const realExecCommand=document.execCommand;
+  const copyButton=document.getElementById("copyMdBtn");
+  const importButton=document.getElementById("importBtn");
+  const focusBefore=importButton.focusCount;
+  try{
+    document.execCommand=()=>true;
+    document.getElementById("copyOnly").onclick();
+    app.miniCopy(copyButton,"text","idle");
+    app.download("audit.md","body","text/markdown");
+    document.getElementById("importBtn").onclick();
+    document.getElementById("importPreview").dispatchEvent({type:"cancel"});
+    app.showPresetStatus("draining");
+    const pending=sandbox.__timers.slice();
+    assert.deepEqual(pending.map(timer=>timer.delay).sort((a,b)=>a-b),[0,500,1400,1400,6000]);
+    const failures=[];
+    for(const timer of pending){
+      try{ timer.callback(); }catch(err){ failures.push(timer.delay+"ms: "+(err&&err.message)); }
+    }
+    assert.deepEqual(failures,[],"no deferred callback may throw");
+    assert.equal(document.getElementById("copiedMsg").classList.contains("hidden"),true);
+    assert.equal(copyButton.textContent,"idle");
+    assert.equal(importButton.focusCount,focusBefore+1);
+    assert.equal(status.textContent,"");
+    assert.equal(status.classList.contains("hidden"),true);
+  }finally{document.execCommand=realExecCommand;}
   sandbox.__timers.length=0;app.resetStorageReportScheduler();
   storage.clear();
 });
