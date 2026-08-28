@@ -49,9 +49,24 @@ lost by accident**.
 - Loading or importing a preset with more than 26 participants once again shows
   the specific participant-limit explanation.
 - A relay larger than one megabyte is refused as a recovery copy rather than
-  being shortened, and the refusal says to use Save file instead.
+  being shortened. Relay Console now asks whether to continue without the copy,
+  so Cancel preserves the active work and gives the user time to save a file.
 - A recovery copy is validated through the same session validator as any import
   before it can be restored, and unusable or expired data is dropped on sight.
+- Starting a new relay while the resume bar is visible now preserves the saved
+  relay in recovery before the new session replaces it.
+- A restored recovery copy remains available until the restored session has
+  autosaved successfully. Failed local storage can no longer consume the only
+  checkpoint.
+- Failed recovery writes now require an explicit choice before restart,
+  discard, or replacement continues.
+- Storage totals are labeled as estimates, account for browser string storage
+  instead of treating characters as bytes, and explain that quotas vary by
+  browser.
+- The saved-relay banner wraps long unbroken questions at phone width instead
+  of creating horizontal page scrolling.
+- Restart and discard confirmations now describe the seven-day recovery window
+  instead of claiming that the action can never be undone.
 
 ### Privacy
 

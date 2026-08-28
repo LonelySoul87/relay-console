@@ -71,9 +71,9 @@ class FakeFileReader{
   readAsText(file){this.result=String(file&&file.content||"");if(typeof this.onload==="function")this.onload();}
 }
 const sandbox={
-  __promptReply:null,__confirmReply:true,__alerts:[],
+  __promptReply:null,__confirmReply:true,__confirmReplies:[],__alerts:[],
   console,document,localStorage,navigator:{clipboard:null},window:{open(){}},Blob,URL,FileReader:FakeFileReader,
-  alert(message){sandbox.__alerts.push(String(message));},confirm(){return sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},setTimeout(){return 0;},clearTimeout(){},
+  alert(message){sandbox.__alerts.push(String(message));},confirm(){return sandbox.__confirmReplies.length?sandbox.__confirmReplies.shift():sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},setTimeout(){return 0;},clearTimeout(){},
   Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error
 };
 vm.createContext(sandbox);
@@ -90,7 +90,7 @@ globalThis.__relayTest={
   getRecoveryOffer(){return recoveryOffer;},
   resetSaveStatus(){lastSaveOk=null;lastSaveAt=null;renderSaveStatus();},
   getSaveStatus(){return {ok:lastSaveOk,at:lastSaveAt};},
-  setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;},
+  setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;globalThis.__confirmReplies=[];},setConfirmReplies(values){globalThis.__confirmReplies=values.slice();},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
 };`;
 vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.4.0-draft.html"});
@@ -595,6 +595,7 @@ test("preset save and delete keep question and answers out of the preset",()=>{
   document.getElementById("presetSave").onclick();
   const saved=app.Store.loadPresets();
   assert.equal(saved.length,1);
+  assert.match(document.getElementById("storageReport").children[0].textContent,new RegExp(`presets ${app.formatBytes(app.Store.usage().presets).replace(".","\\.")}`));
   assert.equal(saved[0].name,"QA preset");
   assert.equal("question" in saved[0],false);
   assert.equal("answers" in saved[0],false);
@@ -606,6 +607,8 @@ test("preset save and delete keep question and answers out of the preset",()=>{
   app.setConfirmReply(true);
   document.getElementById("presetDel").onclick();
   assert.equal(app.Store.loadPresets().length,0);
+  const presetUsage=app.formatBytes(app.Store.usage().presets).replace(".","\\.");
+  assert.match(document.getElementById("storageReport").children[0].textContent,new RegExp(`presets ${presetUsage}`));
 });
 
 test("portable preset export has a versioned privacy-safe envelope",()=>{
@@ -910,6 +913,7 @@ test("unusable recovery data is rejected instead of restored",()=>{
   assert.equal(app.readRecovery(T0,[good]),null);
   assert.equal(app.readRecovery(T0,{...good,v:99}),null);
   assert.equal(app.readRecovery(T0,{...good,savedAt:"soon"}),null);
+  assert.equal(app.readRecovery(T0,{...good,savedAt:T0+1}),null);
   assert.equal(app.readRecovery(T0,{...good,session:{turns:"nope"}}),null);
   assert.equal(app.readRecovery(T0,{...good,session:{...good.session,participants:[participant("p0","Only")]}}),null);
   localStorage.setItem("relayConsole.recovery.v1","{not json");
@@ -924,9 +928,10 @@ test("an oversize checkpoint is refused whole and never truncated",()=>{
   assert.ok(app.recoverySize(app.recoveryRecord(big,"restart",T0))>app.RECOVERY_MAX_BYTES);
   assert.equal(app.captureRecovery(big,"restart",T0),"oversize");
   assert.equal(app.Store.loadRecovery(),null);                     // refused, so nothing at all is stored
-  sandbox.__alerts.length=0;
+  app.setConfirmReply(false);
+  assert.equal(app.captureBeforeDestructive(big,"restart",T0),"blocked");
+  app.setConfirmReply(true);
   assert.equal(app.captureBeforeDestructive(big,"restart",T0),"oversize");
-  assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.recoveryTooLarge"));
   assert.equal(app.Store.loadRecovery(),null);
   const small=recoverableSession();
   assert.equal(app.captureRecovery(small,"restart",T0),"saved");
@@ -938,6 +943,11 @@ test("an empty relay produces no checkpoint at all",()=>{
   assert.equal(app.captureRecovery(emptySession(),"restart",T0),"skipped");
   assert.equal(app.captureRecovery(null,"restart",T0),"skipped");
   assert.equal(app.captureRecovery(undefined,"discard",T0),"skipped");
+  const realOk=app.Store.ok;app.Store.ok=false;
+  try{
+    assert.equal(app.captureRecovery(null,"restart",T0),"skipped");
+    assert.equal(app.captureRecovery(recoverableSession(),"restart",T0),"failed");
+  }finally{app.Store.ok=realOk;}
   assert.equal(app.Store.loadRecovery(),null);
   assert.equal(document.getElementById("recoveryBar").classList.contains("hidden"),true);
 });
@@ -947,10 +957,12 @@ test("Remove clears the checkpoint immediately and Restore refuses when there is
   app.captureRecovery(recoverableSession(),"discard",T0);
   app.refreshRecoveryOffer(T0);
   assert.ok(app.getRecoveryOffer());
+  document.getElementById("question").focusCount=0;
   assert.equal(app.removeRecovery(),true);
   assert.equal(app.Store.loadRecovery(),null);
   assert.equal(app.getRecoveryOffer(),null);
   assert.equal(document.getElementById("recoveryBar").classList.contains("hidden"),true);
+  assert.equal(document.getElementById("question").focusCount,1);
   assert.equal(app.restoreRecovery(),false);
   app.setConfirmReply(false);
   app.captureRecovery(recoverableSession(),"discard",T0);
@@ -969,7 +981,7 @@ test("destructive actions capture before they destroy, and skip when there is no
   app.setConfirmReply(true);
   assert.equal(document.getElementById("restart").onclick(),true);
   assert.equal(app.Store.load(),null);                             // the autosave slot really is cleared
-  const kept=app.readRecovery(T0);
+  const kept=app.readRecovery(Date.now());
   assert.ok(kept);
   assert.equal(kept.reason,"restart");
   assert.equal(kept.session.question,"Recoverable question");
@@ -979,8 +991,8 @@ test("destructive actions capture before they destroy, and skip when there is no
   app.Store.save(saved);app.setResumeOffer(saved);
   assert.equal(document.getElementById("discardBtn").onclick(),true);
   assert.equal(app.Store.load(),null);
-  assert.equal(app.readRecovery(T0).reason,"discard");
-  assert.equal(app.readRecovery(T0).session.question,"Saved relay");
+  assert.equal(app.readRecovery(Date.now()).reason,"discard");
+  assert.equal(app.readRecovery(Date.now()).session.question,"Saved relay");
 
   storage.clear();app.setState(null);app.setResumeOffer(null);
   const raw={version:"2.3.0",question:"Incoming",recipe:"blind",
@@ -990,14 +1002,64 @@ test("destructive actions capture before they destroy, and skip when there is no
   app.renderImportPreview(app.describeImport(raw,app.getState(),[]));
   assert.equal(app.applyPendingImport(),true);
   assert.equal(app.getState().question,"Incoming");
-  assert.equal(app.readRecovery(T0).reason,"replace");
-  assert.equal(app.readRecovery(T0).session.question,"About to be replaced");
+  assert.equal(app.readRecovery(Date.now()).reason,"replace");
+  assert.equal(app.readRecovery(Date.now()).session.question,"About to be replaced");
 
   storage.clear();app.setState(emptySession());app.setResumeOffer(null);
   app.setConfirmReply(true);
   document.getElementById("restart").onclick();
   assert.equal(app.Store.loadRecovery(),null);                     // nothing meaningful, so no checkpoint
   app.setState(null);
+});
+
+test("starting a new relay preserves an offered saved session first",()=>{
+  storage.clear();app.setState(null);
+  const saved=recoverableSession({question:"Saved before Start"});
+  app.Store.save(saved);app.setResumeOffer(saved);
+  app.applyStarter("blind");
+  document.getElementById("question").value="Brand new relay";
+  assert.equal(document.getElementById("start").onclick(),true);
+  assert.equal(app.getState().question,"Brand new relay");
+  assert.equal(app.getResumeOffer(),null);
+  assert.equal(app.readRecovery(Date.now()).session.question,"Saved before Start");
+  app.setState(null);app.setResumeOffer(null);storage.clear();
+});
+
+test("a failed recovery write requires an explicit choice before destruction",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  const live=recoverableSession({question:"Do not lose me"});
+  app.setState(live);app.Store.save(live);
+  const realSaveRecovery=app.Store.saveRecovery;
+  app.Store.saveRecovery=()=>false;
+  try{
+    assert.equal(app.captureRecovery(live,"restart",T0),"failed");
+    app.setConfirmReplies([true,false]);
+    assert.equal(document.getElementById("restart").onclick(),false);
+    assert.equal(app.getState().question,"Do not lose me");
+    assert.equal(app.Store.load().question,"Do not lose me");
+    app.setConfirmReplies([true,true]);
+    assert.equal(document.getElementById("restart").onclick(),true);
+    assert.equal(app.getState(),null);
+    assert.equal(app.Store.load(),null);
+  }finally{app.Store.saveRecovery=realSaveRecovery;app.setConfirmReply(true);}
+});
+
+test("Restore keeps its checkpoint until the restored relay autosaves successfully",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
+  app.captureRecovery(recoverableSession({question:"Keep until saved"}),"replace",T0);
+  app.refreshRecoveryOffer(T0);
+  const realSave=app.Store.save;
+  app.Store.save=()=>false;
+  try{
+    assert.equal(app.restoreRecovery(),true);
+    assert.equal(app.getState().question,"Keep until saved");
+    assert.ok(app.Store.loadRecovery());
+    assert.equal(app.getSaveStatus().ok,false);
+  }finally{app.Store.save=realSave;}
+  assert.equal(app.saveState(T0+1000),true);
+  assert.equal(app.Store.loadRecovery(),null);
+  assert.equal(app.getRecoveryOffer(),null);
+  app.setState(null);app.resetSaveStatus();storage.clear();
 });
 
 test("autosave status reports the last successful save and keeps failures visible",()=>{
@@ -1046,7 +1108,7 @@ test("storage reporting accounts for the recovery slot and offers actionable gui
   assert.ok(used.presets>0);
   assert.equal(used.total,used.session+used.recovery+used.presets+used.roster+used.prefs+used.flags+used.draft);
   app.renderStorageReport();
-  assert.match(report.children[0].textContent,/Relay Console storage: /);
+  assert.match(report.children[0].textContent,/Estimated Relay Console storage: /);
   assert.match(report.children[0].textContent,/recovery /);
   assert.equal(report.classList.contains("near"),false);
   assert.equal(report.children.length,1);                          // no quota advice while there is room
@@ -1054,6 +1116,8 @@ test("storage reporting accounts for the recovery slot and offers actionable gui
   assert.equal(app.formatBytes(512),"512 B");
   assert.equal(app.formatBytes(2048),"2.0 KB");
   assert.equal(app.formatBytes(3*1024*1024),"3.00 MB");
+  const rawRecovery=localStorage.getItem(app.Store.ck);
+  assert.equal(used.recovery,2*(app.Store.ck.length+rawRecovery.length));
 
   const realUsage=app.Store.usage;
   app.Store.usage=()=>({total:app.STORAGE_SOFT_LIMIT+1,session:1,recovery:1,presets:1,roster:0,prefs:0,flags:0,draft:0});
@@ -1071,7 +1135,7 @@ test("recovery and storage copy is complete and honest in all three languages",(
     "recovery.reason.restart","recovery.reason.discard","recovery.reason.replace",
     "save.ok","save.failed","storage.total","storage.quota","storage.unavailable",
     "storage.bytes","storage.kilobytes","storage.megabytes",
-    "confirm.removeRecovery","alert.recoveryTooLarge"];
+    "confirm.removeRecovery","confirm.continueWithoutLargeRecovery","confirm.continueWithoutRecovery"];
   for(const locale of app.SUPPORTED_LOCALES){
     for(const key of keys){
       const value=app.I18N[locale][key];
@@ -1085,6 +1149,8 @@ test("recovery and storage copy is complete and honest in all three languages",(
   assert.match(app.I18N.en["footer.privacy"],/up to seven days/);
   assert.match(app.I18N.fr["footer.privacy"],/sept jours/);
   assert.match(app.I18N.es["footer.privacy"],/siete d\u00edas/);
+  assert.doesNotMatch(app.I18N.en["confirm.discardSession"],/permanent|cannot be undone/i);
+  assert.match(app.I18N.en["confirm.discardSession"],/seven days/i);
   app.setUiLocale("fr",false);
   storage.clear();app.setState(null);app.setResumeOffer(null);
   app.captureRecovery(recoverableSession(),"discard",T0);
@@ -1102,7 +1168,7 @@ test("recovery and storage surfaces stay announced and stay inside a narrow scre
   assert.match(html,/id="recoveryRestore" data-i18n="recovery\.restore"/);
   assert.match(html,/id="recoveryRemove" data-i18n="recovery\.remove"/);
   assert.match(html,/<p class="storagereport" id="storageReport">/);
-  for(const rule of [/\.recovery \.msg\{[^}]*overflow-wrap:anywhere/,/\.storagereport\{[^}]*overflow-wrap:anywhere/,/\.savestatus\{[^}]*overflow-wrap:anywhere/])
+  for(const rule of [/\.resume \.msg\{[^}]*min-width:0;overflow-wrap:anywhere/,/\.recovery \.msg\{[^}]*overflow-wrap:anywhere/,/\.storagereport\{[^}]*overflow-wrap:anywhere/,/\.savestatus\{[^}]*overflow-wrap:anywhere/])
     assert.match(html,rule,String(rule));
   assert.match(html,/\.recovery\{[^}]*flex-wrap:wrap/);
   assert.match(html,/\.savestatus\{[^}]*flex-wrap:wrap/);
