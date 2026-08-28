@@ -29,6 +29,15 @@ lost by accident**.
   language selector instead of moving it to the answer field.
 - Import previews render selected-file content only as text. Previewing does not
   mutate the active relay or storage, and applying presets performs one write.
+- Preset imports now re-check current storage immediately before applying. If
+  another tab changed the saved presets, the review refreshes and no data is
+  overwritten.
+- Website addresses longer than the 300-character safety limit are removed
+  instead of being silently shortened into a different working address.
+- Import review opens with focus on its heading so keyboard and screen-reader
+  users encounter the summary before either action.
+- Loading or importing a preset with more than 26 participants once again shows
+  the specific participant-limit explanation.
 
 ## v2.3.0
 

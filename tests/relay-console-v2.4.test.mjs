@@ -46,7 +46,7 @@ class FakeElement{
   select(){}
   click(){if(typeof this.onclick==="function")this.onclick({target:this});}
   scrollTo(){}
-  showModal(){this.open=true;this.setAttribute("open","");}
+  showModal(){if(this.open)throw new Error("dialog already open");this.open=true;this.setAttribute("open","");}
   close(){this.open=false;this.removeAttribute("open");}
 }
 
@@ -156,6 +156,7 @@ test("ballot parser accepts one explicit, exact ranking line",()=>{
 test("registered language packs have identical keys and placeholders",()=>{
   const enKeys=Object.keys(app.I18N.en).sort();
   const placeholders=value=>Array.from(String(value).matchAll(/\{([A-Za-z0-9_]+)\}/g),m=>m[1]).sort();
+  assert.equal("confirm.import" in app.I18N.en,false);
   assert.deepEqual(Array.from(app.SUPPORTED_LOCALES),["en","fr","es"]);
   for(const locale of app.SUPPORTED_LOCALES){
     assert.deepEqual(Object.keys(app.I18N[locale]).sort(),enKeys,locale);
@@ -500,34 +501,44 @@ test("changing the interface language during a relay preserves keyboard focus",(
 test("import descriptions validate and summarize sessions without mutating state",()=>{
   const raw={version:"2.1.0",question:"Imported question",recipe:"blind",uiLocale:"fr",promptLocale:"es",participants:[participant("p0","A"),participant("p1","B")],turns:[{pid:"p0",name:"A",kind:"blind"},{pid:"p1",name:"B",kind:"blind"}],answers:["answer",""] ,cursor:1};
   const current={question:"Unsaved current relay",answers:["work"],cursor:0,ended:false};
+  const saved={question:"Stored relay",answers:["stored"]};
+  const savedPresets=[app.validatePreset(samplePreset({name:"Stored preset"}))];
+  app.Store.save(saved);app.Store.savePresets(savedPresets);
   app.setState(current);
   const before=JSON.stringify(current);
+  const storedBefore=JSON.stringify({session:app.Store.load(),presets:app.Store.loadPresets()});
   const info=app.describeImport(raw,current,[]);
   assert.equal(info.kind,"session");
   assert.deepEqual(plain(info.summary),{version:"2.1.0",participants:2,turns:2,answered:1,current:2,recipe:"blind",uiLocale:"fr",promptLocale:"es",replaces:true});
   assert.equal(JSON.stringify(current),before);
+  assert.equal(JSON.stringify({session:app.Store.load(),presets:app.Store.loadPresets()}),storedBefore);
   assert.equal(app.describeImport({nonsense:true},current,[]).kind,"unknown");
-  app.setState(null);
+  app.setState(null);app.Store.clear();app.Store.savePresets([]);
 });
 
 test("preset import preview exposes normalization and applies exactly once",()=>{
   const existing=[app.validatePreset(samplePreset({name:"QA"}))];
   const rawPreset=samplePreset({name:"qa",roster:[
     {name:"<img onerror=1>",color:"#10a37f",url:"javascript:alert(1)",role:"R".repeat(125),roleSet:true},
-    {name:"Claude",color:"#d97757",url:"https://claude.ai",role:"Critic",roleSet:true}
+    {name:"Claude",color:"#d97757",url:`https://example.test/${"x".repeat(400)}`,role:"Critic",roleSet:true}
   ]});
   app.Store.savePresets(existing);
   const info=app.describeImport(presetBundle([rawPreset]),null,app.Store.loadPresets());
   assert.equal(info.kind,"presets");
   assert.equal(info.imported[0].name,"qa (2)");
-  assert.deepEqual(plain(info.warnings.map(w=>w.kind).sort()),["renamed","roleTruncated","urlDropped"]);
+  assert.equal(info.imported[0].roster[1].url,"");
+  assert.deepEqual(plain(info.warnings.map(w=>w.kind).sort()),["renamed","roleTruncated","urlDropped","urlDropped"]);
   const before=JSON.stringify(app.Store.loadPresets());
+  document.getElementById("importPreviewHeading").focusCount=0;
+  document.getElementById("applyImport").focusCount=0;
   app.renderImportPreview(info);
   assert.equal(document.getElementById("importPreview").open,true);
   assert.equal(JSON.stringify(app.Store.loadPresets()),before);
   assert.match(document.getElementById("importPreviewItems").children[0].textContent,/qa \(2\)/);
   assert.ok(document.getElementById("importPreviewWarningList").children.every(el=>el.tagName==="LI"));
   assert.ok(document.getElementById("importPreviewItems").children.every(el=>el.tagName==="DIV"));
+  assert.equal(document.getElementById("importPreviewHeading").focusCount,1);
+  assert.equal(document.getElementById("applyImport").focusCount,0);
   let writes=0;const originalSave=app.Store.savePresets;
   app.Store.savePresets=value=>{writes++;return originalSave.call(app.Store,value);};
   try{
@@ -537,6 +548,37 @@ test("preset import preview exposes normalization and applies exactly once",()=>
     assert.equal(app.Store.loadPresets()[1].name,"qa (2)");
     assert.equal(document.getElementById("importPreview").open,false);
   }finally{app.Store.savePresets=originalSave;app.Store.savePresets([]);}
+});
+
+test("preset import refreshes after concurrent storage changes before writing",()=>{
+  const original=app.validatePreset(samplePreset({name:"Original"}));
+  const concurrent=app.validatePreset(samplePreset({name:"Added in another tab"}));
+  app.Store.savePresets([original]);
+  const info=app.describeImport(presetBundle([samplePreset({name:"Incoming"})]),null,app.Store.loadPresets());
+  app.renderImportPreview(info);
+  app.Store.savePresets([original,concurrent]);
+  let writes=0;const originalSave=app.Store.savePresets;
+  app.Store.savePresets=value=>{writes++;return originalSave.call(app.Store,value);};
+  try{
+    assert.equal(app.applyPendingImport(),false);
+    assert.equal(writes,0);
+    assert.deepEqual(plain(app.Store.loadPresets().map(p=>p.name)),["Original","Added in another tab"]);
+    assert.match(document.getElementById("importPreviewIntro").textContent,/review has been refreshed/i);
+    assert.equal(app.applyPendingImport(),true);
+    assert.equal(writes,1);
+    assert.deepEqual(plain(app.Store.loadPresets().map(p=>p.name)),["Original","Added in another tab","Incoming"]);
+  }finally{app.Store.savePresets=originalSave;app.Store.savePresets([]);}
+});
+
+test("oversized preset rosters receive the specific participant-limit message",()=>{
+  const oversized=samplePreset({name:"Too many",roster:Array.from({length:27},(_,i)=>({name:`P${i+1}`}))});
+  assert.equal(app.describeImport(presetBundle([oversized]),null,[]).error,"presetTooMany");
+  app.Store.savePresets([oversized]);
+  document.getElementById("presetSelect").value="0";
+  sandbox.__alerts.length=0;
+  document.getElementById("presetLoad").onclick();
+  assert.match(sandbox.__alerts.at(-1),/more than 26 participants/i);
+  app.Store.savePresets([]);
 });
 
 test("preset save and delete keep question and answers out of the preset",()=>{
@@ -727,6 +769,12 @@ test("preset file handling enforces size and intent behavior",()=>{
   input.files=[{size:100,content:JSON.stringify(session)}];
   input.onchange({target:input});
   assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.expectedPresetBundle"));
+  sandbox.__alerts.length=0;
+  const oversized=samplePreset({name:"Too many",roster:Array.from({length:27},(_,i)=>({name:`P${i+1}`}))});
+  document.getElementById("presetImport").onclick();
+  input.files=[{size:100,content:JSON.stringify(presetBundle([oversized]))}];
+  input.onchange({target:input});
+  assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.presetTooMany"));
 });
 
 test("review packet controls explain privacy and preset files enforce the 1 MB boundary",()=>{
