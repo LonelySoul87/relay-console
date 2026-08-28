@@ -68,6 +68,16 @@ lost by accident**.
 - Restart and discard confirmations now describe the seven-day recovery window
   instead of claiming that the action can never be undone.
 
+- A restore that is waiting for a successful autosave is now tied to the exact
+  checkpoint it came from, so an ordinary later save can never delete a
+  different checkpoint captured in the meantime.
+- A backward clock correction no longer destroys a valid recovery checkpoint.
+  Only a date more than a day ahead is treated as bogus.
+- Every stored size the user can see now uses one unit, so the recovery ceiling
+  and the storage report cannot disagree by a factor of two.
+- Typing a question or editing the roster no longer re-measures all of local
+  storage on every keystroke.
+
 ### Privacy
 
 - Discarded or replaced work can now remain in local browser storage for up to

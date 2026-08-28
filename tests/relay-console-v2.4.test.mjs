@@ -84,7 +84,7 @@ globalThis.__relayTest={
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
   recoveryRecord,recoverySize,recoveryExpired,recoveryExpiresAt,readRecovery,captureRecovery,captureBeforeDestructive,
-  refreshRecoveryOffer,restoreRecovery,removeRecovery,renderRecoveryBar,renderStorageReport,renderSaveStatus,saveState,formatBytes,
+  refreshRecoveryOffer,restoreRecovery,removeRecovery,renderRecoveryBar,renderStorageReport,renderSaveStatus,saveState,formatBytes,saveSetupDraft,scheduleStorageReport,storageBytes,RECOVERY_FUTURE_SKEW_MS,
   RECOVERY_VERSION,RECOVERY_MAX_BYTES,RECOVERY_MAX_AGE_MS,STORAGE_SOFT_LIMIT,
   setResumeOffer(value){resumeOffer=value;},getResumeOffer(){return resumeOffer;},
   getRecoveryOffer(){return recoveryOffer;},
@@ -913,7 +913,8 @@ test("unusable recovery data is rejected instead of restored",()=>{
   assert.equal(app.readRecovery(T0,[good]),null);
   assert.equal(app.readRecovery(T0,{...good,v:99}),null);
   assert.equal(app.readRecovery(T0,{...good,savedAt:"soon"}),null);
-  assert.equal(app.readRecovery(T0,{...good,savedAt:T0+1}),null);
+  assert.ok(app.readRecovery(T0,{...good,savedAt:T0+DAY}));            // an ordinary clock correction is tolerated
+  assert.equal(app.readRecovery(T0,{...good,savedAt:T0+DAY+1}),null);  // a genuinely bogus date is not
   assert.equal(app.readRecovery(T0,{...good,session:{turns:"nope"}}),null);
   assert.equal(app.readRecovery(T0,{...good,session:{...good.session,participants:[participant("p0","Only")]}}),null);
   localStorage.setItem("relayConsole.recovery.v1","{not json");
@@ -1175,6 +1176,94 @@ test("recovery and storage surfaces stay announced and stay inside a narrow scre
   // The recovery bar sits outside both panels so it survives the setup and run switch.
   const bar=html.indexOf('id="recoveryBar"'), setup=html.indexOf('<div id="setup">'), run=html.indexOf('<div id="run"');
   assert.ok(bar>0&&bar<setup&&bar<run);
+});
+
+test("a pending restore consumption can never delete an unrelated checkpoint",()=>{
+  // A bare boolean armed by a failed restore survived Restart and Remove, so the
+  // next ordinary autosave deleted whatever checkpoint happened to exist by then.
+  storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
+  app.captureRecovery(recoverableSession({question:"Session A"}),"restart",T0);
+  app.refreshRecoveryOffer(T0);
+  const realSave=app.Store.save;
+  app.Store.save=()=>false;
+  try{ assert.equal(app.restoreRecovery(),true); }finally{ app.Store.save=realSave; }
+  assert.equal(app.getSaveStatus().ok,false);
+  assert.ok(app.Store.loadRecovery());                       // kept, because the restored relay never saved
+
+  app.setConfirmReply(true);
+  assert.equal(document.getElementById("restart").onclick(),true);
+  assert.equal(app.Store.loadRecovery().session.question,"Session A");
+  app.setState(recoverableSession({question:"Unrelated later relay"}));
+  assert.equal(app.saveState(T0+60000),true);
+  assert.ok(app.Store.loadRecovery(),"an ordinary save must not consume a checkpoint it did not restore");
+  assert.equal(app.Store.loadRecovery().session.question,"Session A");
+
+  // Removing by hand also disarms, so a later capture survives a later save.
+  storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
+  app.captureRecovery(recoverableSession({question:"Session C"}),"discard",T0);
+  app.refreshRecoveryOffer(T0);
+  app.Store.save=()=>false;
+  try{ app.restoreRecovery(); }finally{ app.Store.save=realSave; }
+  app.removeRecovery(false);
+  app.captureRecovery(recoverableSession({question:"Session D"}),"restart",T0+1000);
+  app.setState(recoverableSession({question:"live"}));
+  assert.equal(app.saveState(T0+2000),true);
+  assert.equal(app.Store.loadRecovery().session.question,"Session D");
+
+  // The restore it does belong to is still consumed on the first successful save.
+  storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
+  app.captureRecovery(recoverableSession({question:"Session E"}),"restart",T0);
+  app.refreshRecoveryOffer(T0);
+  app.Store.save=()=>false;
+  try{ app.restoreRecovery(); }finally{ app.Store.save=realSave; }
+  assert.ok(app.Store.loadRecovery());
+  assert.equal(app.saveState(T0+5000),true);
+  assert.equal(app.Store.loadRecovery(),null);
+  assert.equal(document.getElementById("recoveryBar").classList.contains("hidden"),true);
+  app.setState(null);app.resetSaveStatus();
+});
+
+test("every stored size the user can see is reported in one unit",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  const record=app.recoveryRecord(recoverableSession({question:"Q".repeat(500)}),"restart",T0);
+  const chars=JSON.stringify(record).length;
+  assert.equal(app.recoverySize(record),2*chars);             // UTF-16, the unit browsers bill
+  app.Store.saveRecovery(record);
+  const use=app.Store.usage();
+  const keyBytes=2*"relayConsole.recovery.v1".length;
+  assert.equal(use.recovery,app.recoverySize(record)+keyBytes);
+  // The ceiling and the report must not be able to disagree by a factor of two.
+  assert.ok(Math.abs(use.recovery-app.recoverySize(record))<=keyBytes);
+  storage.clear();
+});
+
+test("the storage report is not recomputed on every keystroke",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  app.Store.save(recoverableSession({question:"prior"}));
+  let reads=0;
+  const realUsage=app.Store.usage;
+  app.Store.usage=(...args)=>{reads++;return realUsage.apply(app.Store,args);};
+  try{
+    document.getElementById("question").value="a";
+    app.saveSetupDraft();
+    app.saveSetupDraft();
+    app.saveSetupDraft();
+    // The harness runs timers synchronously, so a debounced call still lands.
+    // What matters is that three keystrokes do not cost three full measurements
+    // more than one coalesced pass would.
+    assert.ok(reads<=3,"expected coalesced storage measurement, saw "+reads);
+    // Structural backstop: the three per-keystroke writers must route through the
+    // coalescing scheduler, never straight into a full measurement.
+    assert.ok(html.includes("function scheduleStorageReport()"));
+    for(const fn of ["function saveSetupDraft()","function persistRoster()","function savePref("]){
+      const at=html.indexOf(fn);
+      assert.ok(at>0,fn+" must exist");
+      const body=html.slice(at,html.indexOf("\n",at));
+      assert.ok(body.includes("scheduleStorageReport()"),fn+" must schedule, not render");
+      assert.ok(!body.includes("renderStorageReport()"),fn+" must not render directly");
+    }
+  }finally{app.Store.usage=realUsage;}
+  storage.clear();
 });
 
 test("standalone privacy boundary remains intact",()=>{

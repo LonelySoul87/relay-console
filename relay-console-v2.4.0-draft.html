@@ -888,15 +888,17 @@ const Store={
   saveRecovery(r){try{localStorage.setItem(this.ck,JSON.stringify(r));return true;}catch(e){return false;}},
   loadRecovery(){try{return JSON.parse(localStorage.getItem(this.ck)||"null");}catch(e){return null;}},
   clearRecovery(){try{localStorage.removeItem(this.ck);}catch(e){}},
-  /* Approximate UTF-16 bytes per slot. Browser quotas vary, so this is a useful
-     estimate for visibility, not a claim about the exact remaining quota. */
+  /* Approximate UTF-16 bytes per slot, the unit browsers actually bill. Quotas
+     vary, so this is a useful estimate for visibility, not a claim about the
+     exact remaining quota. Every stored-size number in the app uses storageBytes
+     so the report and the recovery ceiling can never disagree. */
   usage(){
     const keys={session:this.sk,recovery:this.ck,presets:this.xk,roster:this.rk,prefs:this.pk,flags:this.fk,draft:this.dk};
     const out={total:0};
     Object.keys(keys).forEach(name=>{
       let raw=null;
       try{ raw=localStorage.getItem(keys[name]); }catch(e){ raw=null; }
-      const size=raw==null?0:2*(keys[name].length+raw.length);
+      const size=raw==null?0:storageBytes(keys[name])+storageBytes(raw);
       out[name]=size; out.total+=size;
     });
     return out;
@@ -907,18 +909,17 @@ const Store={
    One slot, never a history. Written only immediately before a destructive
    action would otherwise discard meaningful work. Expires after seven days.
    Refused rather than truncated above one megabyte. */
+function storageBytes(text){ return 2*String(text).length; }   // UTF-16 code units, the unit browser quotas count
 const RECOVERY_VERSION=1;
 const RECOVERY_MAX_BYTES=1024*1024;
 const RECOVERY_MAX_AGE_MS=7*24*60*60*1000;
+const RECOVERY_FUTURE_SKEW_MS=24*60*60*1000;   // tolerate an ordinary clock correction, reject a bogus date
 const RECOVERY_REASONS=["restart","discard","replace"];
 const STORAGE_SOFT_LIMIT=4*1024*1024;
 function recoveryRecord(session,reason,now){
   return {v:RECOVERY_VERSION,savedAt:Number.isFinite(now)?now:Date.now(),reason:RECOVERY_REASONS.includes(reason)?reason:"replace",session};
 }
-function recoverySize(record){
-  try{ const json=JSON.stringify(record); return typeof Blob==="function"?new Blob([json]).size:json.length*2; }
-  catch(e){ return Infinity; }
-}
+function recoverySize(record){ try{ return storageBytes(JSON.stringify(record)); }catch(e){ return Infinity; } }
 function recoveryExpired(record,now){
   const at=record&&Number.isFinite(record.savedAt)?record.savedAt:null;
   if(at==null) return true;
@@ -933,7 +934,7 @@ function readRecovery(now,raw){
   if(record.v!==RECOVERY_VERSION) return null;
   if(!Number.isFinite(record.savedAt)) return null;
   const stamp=Number.isFinite(now)?now:Date.now();
-  if(record.savedAt>stamp) return null;
+  if(record.savedAt-stamp>RECOVERY_FUTURE_SKEW_MS) return null;
   if(recoveryExpired(record,now)) return null;
   let session=null;
   try{ session=validateSession(record.session); }catch(e){ return null; }
@@ -946,9 +947,11 @@ function captureRecovery(session,reason,now){
   if(!Store.ok) return "failed";
   const record=recoveryRecord(session,reason,now);
   if(recoverySize(record)>RECOVERY_MAX_BYTES) return "oversize";
-  return Store.saveRecovery(record)?"saved":"failed";
+  if(!Store.saveRecovery(record)) return "failed";
+  consumeRecoveryAt=null;                        // a fresh capture supersedes any pending consumption
+  return "saved";
 }
-let lastSaveAt=null, lastSaveOk=null, consumeRecoveryOnSave=false;
+let lastSaveAt=null, lastSaveOk=null, consumeRecoveryAt=null;
 function renderSaveStatus(){
   const el=$("saveStatus"); if(!el) return;
   if(lastSaveOk===null){ el.classList.add("hidden"); el.classList.remove("failed"); el.textContent=""; return; }
@@ -962,9 +965,13 @@ function saveState(now){
   const ok=Store.save(state);
   if(ok){
     lastSaveOk=true; lastSaveAt=Number.isFinite(now)?now:Date.now();
-    if(consumeRecoveryOnSave){
-      Store.clearRecovery(); recoveryOffer=null; consumeRecoveryOnSave=false;
-      renderRecoveryBar(); renderStorageReport();
+    if(consumeRecoveryAt!=null){
+      const held=Store.loadRecovery();
+      if(held&&held.savedAt===consumeRecoveryAt){
+        Store.clearRecovery(); recoveryOffer=null;
+        renderRecoveryBar(); renderStorageReport();
+      }
+      consumeRecoveryAt=null;                    // a different record is never ours to consume
     }
   }
   else lastSaveOk=false;
@@ -972,7 +979,7 @@ function saveState(now){
   renderSaveStatus();
   return ok;
 }
-function savePref(k,v){ const p=Store.loadPrefs()||{}; p[k]=v; Store.savePrefs(p); renderStorageReport(); }
+function savePref(k,v){ const p=Store.loadPrefs()||{}; p[k]=v; Store.savePrefs(p); scheduleStorageReport(); }
 
 /* ---------- recovery and storage surfaces ---------- */
 let recoveryOffer=null;
@@ -1009,7 +1016,7 @@ function refreshRecoveryOffer(now){
 }
 function recoveryFocusTarget(){ return state?$("answer"):resumeOffer?$("resumeBtn"):$("question"); }
 function removeRecovery(returnFocus=true){
-  Store.clearRecovery(); recoveryOffer=null; renderRecoveryBar(); renderStorageReport();
+  Store.clearRecovery(); recoveryOffer=null; consumeRecoveryAt=null; renderRecoveryBar(); renderStorageReport();
   const target=returnFocus?recoveryFocusTarget():null;
   if(target)target.focus({preventScroll:true});
   return true;
@@ -1017,8 +1024,8 @@ function removeRecovery(returnFocus=true){
 function restoreRecovery(){
   const offer=recoveryOffer||refreshRecoveryOffer();
   if(!offer){ renderStorageReport(); return false; }
-  consumeRecoveryOnSave=true;
-  try{ beginState(offer.session); }catch(e){ consumeRecoveryOnSave=false; return false; }
+  consumeRecoveryAt=offer.record.savedAt;
+  try{ beginState(offer.session); }catch(e){ consumeRecoveryAt=null; return false; }
   if(lastSaveOk!==true){ recoveryOffer=offer; renderRecoveryBar(); }
   resumeOffer=null; $("resumeBar").classList.add("hidden");
   renderStorageReport();
@@ -1035,6 +1042,12 @@ function captureBeforeDestructive(session,reason,now){
     if(!confirm(t(key))) return "blocked";
   }
   return result;
+}
+let storageReportPending=false;
+function scheduleStorageReport(){
+  if(storageReportPending) return;
+  storageReportPending=true;
+  setTimeout(()=>{ storageReportPending=false; renderStorageReport(); },500);
 }
 function renderStorageReport(){
   const el=$("storageReport"); if(!el) return;
@@ -1280,7 +1293,7 @@ function setupEditClearsStarter(event){
 $("setup").addEventListener("input",setupEditClearsStarter);
 $("setup").addEventListener("change",setupEditClearsStarter);
 
-function persistRoster(){ Store.saveRoster(parts.map(p=>({name:p.name,color:p.color,url:p.url,role:p.role,roleSet:!!p.roleSet}))); renderStorageReport(); }
+function persistRoster(){ Store.saveRoster(parts.map(p=>({name:p.name,color:p.color,url:p.url,role:p.role,roleSet:!!p.roleSet}))); scheduleStorageReport(); }
 
 function planEndsInUnassignedSynth(){
   const r=RECIPES[recipe];
@@ -2310,7 +2323,7 @@ $("presetDel").onclick=()=>{
 };
 
 /* ---------- setup draft ---------- */
-function saveSetupDraft(){ Store.saveDraft({question:$("question").value}); renderStorageReport(); }
+function saveSetupDraft(){ Store.saveDraft({question:$("question").value}); scheduleStorageReport(); }
 $("question").addEventListener("input",saveSetupDraft);
 
 /* ---------- boot ---------- */
