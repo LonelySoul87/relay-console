@@ -71,6 +71,9 @@ lost by accident**.
 - A restore that is waiting for a successful autosave is now tied to the exact
   checkpoint it came from, so an ordinary later save can never delete a
   different checkpoint captured in the meantime.
+- Continuing a destructive action after a failed or oversize replacement now
+  disarms the earlier restore relationship. A later save cannot delete the old
+  checkpoint that remained in storage.
 - A backward clock correction no longer destroys a valid recovery checkpoint.
   Only a date more than a day ahead is treated as bogus.
 - Every stored size the user can see now uses one unit, so the recovery ceiling

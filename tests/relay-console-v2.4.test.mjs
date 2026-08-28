@@ -71,9 +71,11 @@ class FakeFileReader{
   readAsText(file){this.result=String(file&&file.content||"");if(typeof this.onload==="function")this.onload();}
 }
 const sandbox={
-  __promptReply:null,__confirmReply:true,__confirmReplies:[],__alerts:[],
+  __promptReply:null,__confirmReply:true,__confirmReplies:[],__alerts:[],__timers:[],__nextTimerId:0,
   console,document,localStorage,navigator:{clipboard:null},window:{open(){}},Blob,URL,FileReader:FakeFileReader,
-  alert(message){sandbox.__alerts.push(String(message));},confirm(){return sandbox.__confirmReplies.length?sandbox.__confirmReplies.shift():sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},setTimeout(){return 0;},clearTimeout(){},
+  alert(message){sandbox.__alerts.push(String(message));},confirm(){return sandbox.__confirmReplies.length?sandbox.__confirmReplies.shift():sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},
+  setTimeout(callback,delay=0){const id=++sandbox.__nextTimerId;sandbox.__timers.push({id,callback,delay});return id;},
+  clearTimeout(id){sandbox.__timers=sandbox.__timers.filter(timer=>timer.id!==id);},
   Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error
 };
 vm.createContext(sandbox);
@@ -88,6 +90,8 @@ globalThis.__relayTest={
   RECOVERY_VERSION,RECOVERY_MAX_BYTES,RECOVERY_MAX_AGE_MS,STORAGE_SOFT_LIMIT,
   setResumeOffer(value){resumeOffer=value;},getResumeOffer(){return resumeOffer;},
   getRecoveryOffer(){return recoveryOffer;},
+  getConsumeRecoveryToken(){return consumeRecoveryToken;},
+  resetStorageReportScheduler(){storageReportPending=false;},
   resetSaveStatus(){lastSaveOk=null;lastSaveAt=null;renderSaveStatus();},
   getSaveStatus(){return {ok:lastSaveOk,at:lastSaveAt};},
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;globalThis.__confirmReplies=[];},setConfirmReplies(values){globalThis.__confirmReplies=values.slice();},
@@ -1223,11 +1227,50 @@ test("a pending restore consumption can never delete an unrelated checkpoint",()
   app.setState(null);app.resetSaveStatus();
 });
 
+test("destructive continuation and exact identity protect replacement checkpoints",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
+  const now=Date.now();
+  app.captureRecovery(recoverableSession({question:"Original checkpoint"}),"restart",now);
+  app.refreshRecoveryOffer(now);
+  const realSave=app.Store.save;
+  const realSaveRecovery=app.Store.saveRecovery;
+  app.Store.save=()=>false;
+  try{ assert.equal(app.restoreRecovery(),true); }finally{ app.Store.save=realSave; }
+  assert.ok(app.Store.loadRecovery());
+
+  app.Store.saveRecovery=()=>false;
+  try{
+    app.setConfirmReplies([true,true]);
+    assert.equal(document.getElementById("restart").onclick(),true);
+  }finally{ app.Store.saveRecovery=realSaveRecovery;app.setConfirmReply(true); }
+  assert.ok(app.Store.loadRecovery(),"the failed replacement must leave the older checkpoint in place");
+  assert.equal(app.getConsumeRecoveryToken(),null);
+
+  app.setState(recoverableSession({question:"Later relay"}));
+  assert.equal(app.saveState(now+5000),true);
+  assert.ok(app.Store.loadRecovery(),"continuing without a replacement must not arm deletion of the old checkpoint");
+  assert.equal(app.Store.loadRecovery().session.question,"Original checkpoint");
+
+  // A same-millisecond record from another tab or a manual storage edit is also
+  // different work and must never be identified by savedAt alone.
+  storage.clear();app.setState(null);app.resetSaveStatus();
+  app.captureRecovery(recoverableSession({question:"Restored record"}),"restart",now);
+  app.refreshRecoveryOffer(now);
+  app.Store.save=()=>false;
+  try{ assert.equal(app.restoreRecovery(),true); }finally{ app.Store.save=realSave; }
+  const sameTimeDifferentRecord=app.recoveryRecord(recoverableSession({question:"Different record"}),"restart",now);
+  assert.equal(app.Store.saveRecovery(sameTimeDifferentRecord),true);
+  app.setState(recoverableSession({question:"Current relay"}));
+  assert.equal(app.saveState(now+6000),true);
+  assert.equal(app.Store.loadRecovery().session.question,"Different record");
+  app.setState(null);app.resetSaveStatus();storage.clear();
+});
+
 test("every stored size the user can see is reported in one unit",()=>{
   storage.clear();app.setState(null);app.setResumeOffer(null);
   const record=app.recoveryRecord(recoverableSession({question:"Q".repeat(500)}),"restart",T0);
   const chars=JSON.stringify(record).length;
-  assert.equal(app.recoverySize(record),2*chars);             // UTF-16, the unit browsers bill
+  assert.equal(app.recoverySize(record),2*chars);             // one conservative code-unit estimate everywhere
   app.Store.saveRecovery(record);
   const use=app.Store.usage();
   const keyBytes=2*"relayConsole.recovery.v1".length;
@@ -1240,6 +1283,7 @@ test("every stored size the user can see is reported in one unit",()=>{
 test("the storage report is not recomputed on every keystroke",()=>{
   storage.clear();app.setState(null);app.setResumeOffer(null);
   app.Store.save(recoverableSession({question:"prior"}));
+  sandbox.__timers.length=0;app.resetStorageReportScheduler();
   let reads=0;
   const realUsage=app.Store.usage;
   app.Store.usage=(...args)=>{reads++;return realUsage.apply(app.Store,args);};
@@ -1248,10 +1292,14 @@ test("the storage report is not recomputed on every keystroke",()=>{
     app.saveSetupDraft();
     app.saveSetupDraft();
     app.saveSetupDraft();
-    // The harness runs timers synchronously, so a debounced call still lands.
-    // What matters is that three keystrokes do not cost three full measurements
-    // more than one coalesced pass would.
-    assert.ok(reads<=3,"expected coalesced storage measurement, saw "+reads);
+    assert.equal(reads,0,"measurement must wait for the coalescing window");
+    const scheduled=sandbox.__timers.filter(timer=>timer.delay===500);
+    assert.equal(scheduled.length,1,"three rapid writes must schedule one measurement");
+    sandbox.__timers=sandbox.__timers.filter(timer=>timer.id!==scheduled[0].id);
+    scheduled[0].callback();
+    assert.equal(reads,1,"the scheduled pass must measure storage exactly once");
+    app.saveSetupDraft();
+    assert.equal(sandbox.__timers.filter(timer=>timer.delay===500).length,1,"a later burst may schedule one new pass");
     // Structural backstop: the three per-keystroke writers must route through the
     // coalescing scheduler, never straight into a full measurement.
     assert.ok(html.includes("function scheduleStorageReport()"));
@@ -1262,7 +1310,7 @@ test("the storage report is not recomputed on every keystroke",()=>{
       assert.ok(body.includes("scheduleStorageReport()"),fn+" must schedule, not render");
       assert.ok(!body.includes("renderStorageReport()"),fn+" must not render directly");
     }
-  }finally{app.Store.usage=realUsage;}
+  }finally{app.Store.usage=realUsage;sandbox.__timers.length=0;app.resetStorageReportScheduler();}
   storage.clear();
 });
 

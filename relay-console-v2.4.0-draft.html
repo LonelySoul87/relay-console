@@ -888,10 +888,11 @@ const Store={
   saveRecovery(r){try{localStorage.setItem(this.ck,JSON.stringify(r));return true;}catch(e){return false;}},
   loadRecovery(){try{return JSON.parse(localStorage.getItem(this.ck)||"null");}catch(e){return null;}},
   clearRecovery(){try{localStorage.removeItem(this.ck);}catch(e){}},
-  /* Approximate UTF-16 bytes per slot, the unit browsers actually bill. Quotas
-     vary, so this is a useful estimate for visibility, not a claim about the
-     exact remaining quota. Every stored-size number in the app uses storageBytes
-     so the report and the recovery ceiling can never disagree. */
+  /* Conservative stored-string estimate at two bytes per JavaScript code unit.
+     Browser quota accounting is implementation-defined, so this is useful for
+     visibility, not a claim about exact disk use or remaining quota. Every
+     stored-size number in the app uses storageBytes so the report and recovery
+     ceiling cannot disagree with each other. */
   usage(){
     const keys={session:this.sk,recovery:this.ck,presets:this.xk,roster:this.rk,prefs:this.pk,flags:this.fk,draft:this.dk};
     const out={total:0};
@@ -909,7 +910,7 @@ const Store={
    One slot, never a history. Written only immediately before a destructive
    action would otherwise discard meaningful work. Expires after seven days.
    Refused rather than truncated above one megabyte. */
-function storageBytes(text){ return 2*String(text).length; }   // UTF-16 code units, the unit browser quotas count
+function storageBytes(text){ return 2*String(text).length; }   // consistent UTF-16 code-unit estimate
 const RECOVERY_VERSION=1;
 const RECOVERY_MAX_BYTES=1024*1024;
 const RECOVERY_MAX_AGE_MS=7*24*60*60*1000;
@@ -948,10 +949,11 @@ function captureRecovery(session,reason,now){
   const record=recoveryRecord(session,reason,now);
   if(recoverySize(record)>RECOVERY_MAX_BYTES) return "oversize";
   if(!Store.saveRecovery(record)) return "failed";
-  consumeRecoveryAt=null;                        // a fresh capture supersedes any pending consumption
+  consumeRecoveryToken=null;                     // a fresh capture supersedes any pending consumption
   return "saved";
 }
-let lastSaveAt=null, lastSaveOk=null, consumeRecoveryAt=null;
+function recoveryIdentity(record){ try{ return JSON.stringify(record); }catch(e){ return null; } }
+let lastSaveAt=null, lastSaveOk=null, consumeRecoveryToken=null;
 function renderSaveStatus(){
   const el=$("saveStatus"); if(!el) return;
   if(lastSaveOk===null){ el.classList.add("hidden"); el.classList.remove("failed"); el.textContent=""; return; }
@@ -965,13 +967,13 @@ function saveState(now){
   const ok=Store.save(state);
   if(ok){
     lastSaveOk=true; lastSaveAt=Number.isFinite(now)?now:Date.now();
-    if(consumeRecoveryAt!=null){
+    if(consumeRecoveryToken!=null){
       const held=Store.loadRecovery();
-      if(held&&held.savedAt===consumeRecoveryAt){
+      if(held&&recoveryIdentity(held)===consumeRecoveryToken){
         Store.clearRecovery(); recoveryOffer=null;
         renderRecoveryBar(); renderStorageReport();
       }
-      consumeRecoveryAt=null;                    // a different record is never ours to consume
+      consumeRecoveryToken=null;                 // a different record is never ours to consume
     }
   }
   else lastSaveOk=false;
@@ -1016,7 +1018,7 @@ function refreshRecoveryOffer(now){
 }
 function recoveryFocusTarget(){ return state?$("answer"):resumeOffer?$("resumeBtn"):$("question"); }
 function removeRecovery(returnFocus=true){
-  Store.clearRecovery(); recoveryOffer=null; consumeRecoveryAt=null; renderRecoveryBar(); renderStorageReport();
+  Store.clearRecovery(); recoveryOffer=null; consumeRecoveryToken=null; renderRecoveryBar(); renderStorageReport();
   const target=returnFocus?recoveryFocusTarget():null;
   if(target)target.focus({preventScroll:true});
   return true;
@@ -1024,8 +1026,8 @@ function removeRecovery(returnFocus=true){
 function restoreRecovery(){
   const offer=recoveryOffer||refreshRecoveryOffer();
   if(!offer){ renderStorageReport(); return false; }
-  consumeRecoveryAt=offer.record.savedAt;
-  try{ beginState(offer.session); }catch(e){ consumeRecoveryAt=null; return false; }
+  consumeRecoveryToken=recoveryIdentity(offer.record);
+  try{ beginState(offer.session); }catch(e){ consumeRecoveryToken=null; return false; }
   if(lastSaveOk!==true){ recoveryOffer=offer; renderRecoveryBar(); }
   resumeOffer=null; $("resumeBar").classList.add("hidden");
   renderStorageReport();
@@ -1041,6 +1043,7 @@ function captureBeforeDestructive(session,reason,now){
     const key=result==="oversize"?"confirm.continueWithoutLargeRecovery":"confirm.continueWithoutRecovery";
     if(!confirm(t(key))) return "blocked";
   }
+  consumeRecoveryToken=null;                     // the destructive action is now leaving the restored workflow
   return result;
 }
 let storageReportPending=false;
