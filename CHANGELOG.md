@@ -1,5 +1,40 @@
 # Changelog
 
+## v2.3.0 draft
+
+Development release focused on portable workflows and safer independent review
+handoffs.
+
+### Added
+- **Portable preset bundles.** Export up to 50 saved presets as one versioned
+  JSON file and import them on another browser or computer.
+- **Collision-safe imports.** Imported names receive a visible numeric suffix
+  when needed, so an existing preset is never silently replaced.
+- **Review packets.** Export a compact Markdown review handoff containing the
+  question, configuration, roles, captured answers, actual forwarded context,
+  warnings, and ballot results without duplicating generated prompts.
+- **Review privacy guidance.** The transcript panel now states that captured
+  answers remain in review packets and that context trimming is not redaction.
+
+### Fixed and hardened
+- Imported presets are normalized through one strict validator before storage
+  or use, with limits for file size, count, roster size, custom steps, rounds,
+  names, roles, and URLs.
+- Preset URLs now accept only HTTP and HTTPS addresses. Unknown fields are
+  discarded, and a failed import leaves every existing preset unchanged.
+- Existing local presets use the same validation path and remain compatible.
+- Loading a preset now persists its complete setup, including the recipe,
+  format, rounds, closing choice, custom steps, and prompt language.
+- Missing rounds now consistently fall back to one.
+- The quick-start status clears as soon as the applied setup is edited.
+- The no-em-dash regression check now scans active product, repository,
+  planning, and test text instead of a fixed list of files.
+
+### Unchanged by design
+- Relay Console remains one offline HTML file with no backend, external
+  dependencies, trackers, APIs, or automated answer capture.
+- Earlier tagged release files and tags remain untouched.
+
 ## v2.2.0
 
 Feature release focused on reusable localization and faster real-world
