@@ -26,7 +26,7 @@ class FakeElement{
   constructor(tag="div",id=""){
     this.tagName=tag.toUpperCase();this.id=id;this.children=[];this.style={};this.classList=new FakeClassList();
     this.value="";this.checked=false;this.disabled=false;this.textContent="";this.dataset={};this.attributes={};
-    this.offsetLeft=0;this.offsetWidth=0;this.clientWidth=0;this.parentNode=null;this.files=[];
+    this.offsetLeft=0;this.offsetWidth=0;this.clientWidth=0;this.parentNode=null;this.files=[];this.listeners={};
   }
   set innerHTML(value){this._innerHTML=String(value);this.children=[];}
   get innerHTML(){return this._innerHTML||"";}
@@ -38,7 +38,8 @@ class FakeElement{
   setAttribute(name,value){this.attributes[name]=String(value);}
   removeAttribute(name){delete this.attributes[name];}
   getAttribute(name){return this.attributes[name]??null;}
-  addEventListener(){}
+  addEventListener(type,handler){if(!this.listeners[type])this.listeners[type]=[];this.listeners[type].push(handler);}
+  dispatchEvent(event){const value=event||{};if(!value.target)value.target=this;(this.listeners[value.type]||[]).forEach(handler=>handler.call(this,value));return true;}
   querySelector(){return null;}
   querySelectorAll(){return [];}
   focus(){}
@@ -64,10 +65,13 @@ const localStorage={
   getItem(k){return storage.has(String(k))?storage.get(String(k)):null;},
   removeItem(k){storage.delete(String(k));}
 };
+class FakeFileReader{
+  readAsText(file){this.result=String(file&&file.content||"");if(typeof this.onload==="function")this.onload();}
+}
 const sandbox={
-  __promptReply:null,__confirmReply:true,
-  console,document,localStorage,navigator:{clipboard:null},window:{open(){}},Blob,URL,
-  alert(){},confirm(){return sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},setTimeout(){return 0;},clearTimeout(){},
+  __promptReply:null,__confirmReply:true,__alerts:[],
+  console,document,localStorage,navigator:{clipboard:null},window:{open(){}},Blob,URL,FileReader:FakeFileReader,
+  alert(message){sandbox.__alerts.push(String(message));},confirm(){return sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},setTimeout(){return 0;},clearTimeout(){},
   Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error
 };
 vm.createContext(sandbox);
@@ -75,7 +79,7 @@ const exportsCode=`
 globalThis.__relayTest={
   parseBallot,isExactRanking,ballotTally,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
-  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,
+  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
@@ -121,10 +125,14 @@ test("all active product, planning, and repository text contains no em dashes",(
   const root=fileURLToPath(new URL("..",import.meta.url));
   const docs=fileURLToPath(new URL("../docs",import.meta.url));
   const tests=fileURLToPath(new URL("../tests",import.meta.url));
+  const github=fileURLToPath(new URL("../.github",import.meta.url));
+  const walk=(dir,extensions)=>readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
+    const path=join(dir,entry.name);
+    return entry.isDirectory()?walk(path,extensions):(extensions.some(ext=>entry.name.endsWith(ext))?[path]:[]);
+  });
   const paths=[htmlPath,fileURLToPath(new URL("../index.html",import.meta.url)),fileURLToPath(new URL("../landing.html",import.meta.url))];
   for(const name of readdirSync(root))if(name.endsWith(".md"))paths.push(join(root,name));
-  for(const name of readdirSync(docs))if(name.endsWith(".md"))paths.push(join(docs,name));
-  for(const name of readdirSync(tests))if(name.endsWith(".mjs"))paths.push(join(tests,name));
+  paths.push(...walk(docs,[".md"]),...walk(tests,[".mjs",".json"]),...walk(github,[".yml",".yaml",".md"]));
   for(const path of paths) assert.doesNotMatch(readFileSync(path,"utf8"),/\u2014/,path);
 });
 
@@ -449,6 +457,15 @@ test("portable preset export has a versioned privacy-safe envelope",()=>{
   assert.equal("unknown" in bundle.presets[0],false);
 });
 
+test("preset export keeps valid entries and reports malformed stored entries",()=>{
+  const malformed={name:"Broken legacy",roster:[{name:"Only one"}],recipe:"debate"};
+  const prepared=plain(app.preparePresetExport([samplePreset({name:"Good"}),malformed]));
+  assert.deepEqual(prepared.bundle.presets.map(p=>p.name),["Good"]);
+  assert.deepEqual(prepared.skipped,["Broken legacy"]);
+  assert.deepEqual(plain(app.exportPresetBundle([samplePreset({name:"Good"}),malformed])).presets.map(p=>p.name),["Good"]);
+  assert.throws(()=>app.exportPresetBundle([malformed]));
+});
+
 test("portable presets round trip through the strict bundle validator",()=>{
   const exported=app.exportPresetBundle([samplePreset()]);
   const imported=app.validatePresetBundle(plain(exported));
@@ -534,11 +551,26 @@ test("older local presets load through the validator and persist every setup pre
   assert.equal(prefs.promptLocale,"es");
 });
 
-test("changing configuration clears the applied quick-start status",()=>{
+test("saving preset names uses the same case-insensitive collision rule as import",()=>{
+  storage.clear();
+  app.setConfirmReply(true);
+  app.setPromptReply("Case Test");
+  document.getElementById("presetSave").onclick();
+  app.setPromptReply("case test");
+  document.getElementById("presetSave").onclick();
+  const saved=app.Store.loadPresets();
+  assert.equal(saved.length,1);
+  assert.equal(saved[0].name,"case test");
+});
+
+test("interface language preserves quick-start status while setup edits clear it",()=>{
   app.applyStarter("blind");
   assert.equal(document.getElementById("starterStatus").classList.contains("hidden"),false);
-  app.setRecipe("debate");
+  app.setUiLocale("fr");
+  assert.equal(document.getElementById("starterStatus").classList.contains("hidden"),false);
+  document.getElementById("setup").dispatchEvent({type:"input",target:document.getElementById("rounds")});
   assert.equal(document.getElementById("starterStatus").classList.contains("hidden"),true);
+  app.setUiLocale("en");
 });
 
 test("review packets use the prompt language and include only review-relevant relay data",()=>{
@@ -564,13 +596,29 @@ test("review packets use the prompt language and include only review-relevant re
   assert.doesNotMatch(packet,/GENERATED-SECRET/);
   assert.doesNotMatch(packet,/RXTEST1234/);
   assert.equal((packet.match(/RPPACKET123/g)||[]).length,3);
+  assert.equal((packet.match(/CLASSEMENT : B > A/g)||[]).length,1);
+  assert.match(packet,/identique à la réponse capturée/);
   assert.ok(packet.length<12000);
+});
+
+test("preset file handling enforces size and intent behavior",()=>{
+  const input=document.getElementById("importFile");
+  sandbox.__alerts.length=0;
+  document.getElementById("presetImport").onclick();
+  input.files=[{size:app.MAX_PRESET_FILE_BYTES+1,content:"{}"}];
+  input.onchange({target:input});
+  assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.presetFileTooLarge"));
+  sandbox.__alerts.length=0;
+  const session={question:"Q",participants:[participant("p0","A"),participant("p1","B")],turns:[{pid:"p0",name:"A",kind:"blind"},{pid:"p1",name:"B",kind:"blind"}],answers:["",""]};
+  document.getElementById("presetImport").onclick();
+  input.files=[{size:100,content:JSON.stringify(session)}];
+  input.onchange({target:input});
+  assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.expectedPresetBundle"));
 });
 
 test("review packet controls explain privacy and preset files enforce the 1 MB boundary",()=>{
   assert.match(html,/id="reviewPacketBtn"/);
   assert.match(html,/data-i18n="transcript\.packetWarning"/);
-  assert.match(html,/f\.size>MAX_PRESET_FILE_BYTES/);
   assert.equal(app.MAX_PRESET_FILE_BYTES,1024*1024);
 });
 
