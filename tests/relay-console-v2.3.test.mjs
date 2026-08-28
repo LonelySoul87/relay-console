@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import {existsSync,readFileSync} from "node:fs";
+import {createHash} from "node:crypto";
+import {existsSync,readFileSync,readdirSync} from "node:fs";
+import {join} from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import {fileURLToPath} from "node:url";
 
-const htmlPath=fileURLToPath(new URL("../relay-console-v2.2.0.html",import.meta.url));
+const htmlPath=fileURLToPath(new URL("../relay-console-v2.3.0.html",import.meta.url));
 const html=readFileSync(htmlPath,"utf8");
 const scriptStart=html.indexOf("<script>")+8;
 const scriptEnd=html.lastIndexOf("</script>");
@@ -25,7 +27,7 @@ class FakeElement{
   constructor(tag="div",id=""){
     this.tagName=tag.toUpperCase();this.id=id;this.children=[];this.style={};this.classList=new FakeClassList();
     this.value="";this.checked=false;this.disabled=false;this.textContent="";this.dataset={};this.attributes={};
-    this.offsetLeft=0;this.offsetWidth=0;this.clientWidth=0;this.parentNode=null;this.files=[];
+    this.offsetLeft=0;this.offsetWidth=0;this.clientWidth=0;this.parentNode=null;this.files=[];this.listeners={};
   }
   set innerHTML(value){this._innerHTML=String(value);this.children=[];}
   get innerHTML(){return this._innerHTML||"";}
@@ -37,7 +39,8 @@ class FakeElement{
   setAttribute(name,value){this.attributes[name]=String(value);}
   removeAttribute(name){delete this.attributes[name];}
   getAttribute(name){return this.attributes[name]??null;}
-  addEventListener(){}
+  addEventListener(type,handler){if(!this.listeners[type])this.listeners[type]=[];this.listeners[type].push(handler);}
+  dispatchEvent(event){const value=event||{};if(!value.target)value.target=this;(this.listeners[value.type]||[]).forEach(handler=>handler.call(this,value));return true;}
   querySelector(){return null;}
   querySelectorAll(){return [];}
   focus(){}
@@ -63,10 +66,13 @@ const localStorage={
   getItem(k){return storage.has(String(k))?storage.get(String(k)):null;},
   removeItem(k){storage.delete(String(k));}
 };
+class FakeFileReader{
+  readAsText(file){this.result=String(file&&file.content||"");if(typeof this.onload==="function")this.onload();}
+}
 const sandbox={
-  __promptReply:null,__confirmReply:true,
-  console,document,localStorage,navigator:{clipboard:null},window:{open(){}},Blob,URL,
-  alert(){},confirm(){return sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},setTimeout(){return 0;},clearTimeout(){},
+  __promptReply:null,__confirmReply:true,__alerts:[],
+  console,document,localStorage,navigator:{clipboard:null},window:{open(){}},Blob,URL,FileReader:FakeFileReader,
+  alert(message){sandbox.__alerts.push(String(message));},confirm(){return sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},setTimeout(){return 0;},clearTimeout(){},
   Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error
 };
 vm.createContext(sandbox);
@@ -74,52 +80,73 @@ const exportsCode=`
 globalThis.__relayTest={
   parseBallot,isExactRanking,ballotTally,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
-  STARTER_CONFIGS,applyStarter,
+  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,
+  PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
 };`;
-vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.2.0.html"});
+vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.3.0.html"});
 const app=sandbox.__relayTest;
 
 function participant(id,name){return {id,name,color:"#10a37f",url:"",role:""};}
+const plain=value=>JSON.parse(JSON.stringify(value));
+function samplePreset(overrides={}){
+  return {
+    v:3,name:"Portable QA",roster:[
+      {name:"ChatGPT",color:"#10a37f",url:"https://chatgpt.com",role:"Drafter",roleSet:true},
+      {name:"Claude",color:"#d97757",url:"https://claude.ai",role:"Critic",roleSet:true}
+    ],recipe:"dcr",customSteps:[{pi:0,kind:"blind",role:"",roleKey:"drafter"}],rounds:2,closing:true,format:"markdown",promptLocale:"fr",...overrides
+  };
+}
+function presetBundle(presets){return {kind:"relay-console-presets",formatVersion:1,app:"2.3.0-draft",exported:"2026-08-28T00:00:00.000Z",presets};}
 function stateFor(turns,participants,answers){
   return {
-    version:"2.2.0",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
+    version:"2.3.0-draft",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
     participants,turns,synthPid:null,answers,forward:turns.map(()=>null),stale:turns.map(()=>false),prompts:turns.map(()=>null),
     promptStale:turns.map(()=>false),draftAnswers:turns.map(()=>null),review:turns.map(()=>false),ballots:turns.map(()=>null),ballotManual:turns.map(()=>false),cursor:0,ended:false,ts:1
   };
 }
 
-test("v2.2 JavaScript loads in a minimal browser environment",()=>{
+test("v2.3 release JavaScript loads in a minimal browser environment",()=>{
   assert.equal(typeof app.parseBallot,"function");
   assert.equal(app.MAX_PARTICIPANTS,26);
-  assert.match(html,/<title>Relay Console v2\.2\.0<\/title>/);
-  assert.match(html,/const VERSION="2\.2\.0";/);
-  assert.doesNotMatch(html,/v2\.2\.0 draft|2\.2\.0-draft/);
+  assert.match(html,/<title>Relay Console v2\.3\.0<\/title>/);
+  assert.match(html,/const VERSION="2\.3\.0";/);
+  assert.match(html,/<span class="ver">v2\.3\.0<\/span>/);
+  assert.doesNotMatch(html,/v2\.3\.0 draft|2\.3\.0-draft/);
+  assert.doesNotMatch(html,/v2\.2\.0/);
   assert.match(html,/id="uiLocale"/);
   assert.match(html,/id="promptLocale"/);
   assert.match(html,/registerLocale\("es","Español",ES\)/);
   assert.match(html,/data-starter="dcr"/);
+  assert.deepEqual(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url))),readFileSync(htmlPath));
+  const sums=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)),"utf8");
+  const expectedFiles=["relay-console-v1.8.2.html","relay-console-v1.8.3.html","relay-console-v1.8.4.html","relay-console-v1.9.0.html","relay-console-v2.0.0.html","relay-console-v2.1.0.html","relay-console-v2.2.0.html","relay-console-v2.3.0.html"];
+  const sumLines=sums.trim().split(/\r?\n/);
+  assert.equal(sumLines.length,expectedFiles.length);
+  for(const [i,line] of sumLines.entries()){
+    const match=line.match(/^([0-9a-f]{64})  (relay-console-v[0-9.]+\.html)$/);
+    assert.ok(match,line);
+    assert.equal(match[2],expectedFiles[i]);
+    const releaseBytes=readFileSync(fileURLToPath(new URL(`../${match[2]}`,import.meta.url)));
+    assert.equal(createHash("sha256").update(releaseBytes).digest("hex"),match[1],match[2]);
+  }
   assert.match(html,/el\.innerHTML=t\(el\.dataset\.i18nHtml/);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
 });
 
-test("active v2.2 product and release text contains no em dashes",()=>{
-  const paths=[
-    htmlPath,
-    fileURLToPath(new URL("../index.html",import.meta.url)),
-    fileURLToPath(new URL("../landing.html",import.meta.url)),
-    fileURLToPath(new URL("../README.md",import.meta.url)),
-    fileURLToPath(new URL("../CONTRIBUTING.md",import.meta.url)),
-    fileURLToPath(new URL("../CHANGELOG.md",import.meta.url)),
-    fileURLToPath(new URL("../docs/page-copy.md",import.meta.url)),
-    fileURLToPath(new URL("../docs/release-template.md",import.meta.url)),
-    fileURLToPath(new URL("../docs/visibility.md",import.meta.url)),
-    fileURLToPath(new URL("../docs/v2.2.0-roadmap.md",import.meta.url)),
-    fileURLToPath(new URL("../docs/v2.2.0-progress.md",import.meta.url)),
-    fileURLToPath(new URL("../docs/v2.2.0-release-notes.md",import.meta.url)),
-    fileURLToPath(new URL("../docs/v2.2.0-release-audit.md",import.meta.url))
-  ];
+test("all active product, planning, and repository text contains no em dashes",()=>{
+  const root=fileURLToPath(new URL("..",import.meta.url));
+  const docs=fileURLToPath(new URL("../docs",import.meta.url));
+  const tests=fileURLToPath(new URL("../tests",import.meta.url));
+  const github=fileURLToPath(new URL("../.github",import.meta.url));
+  const walk=(dir,extensions)=>readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
+    const path=join(dir,entry.name);
+    return entry.isDirectory()?walk(path,extensions):(extensions.some(ext=>entry.name.endsWith(ext))?[path]:[]);
+  });
+  const paths=[htmlPath,fileURLToPath(new URL("../index.html",import.meta.url)),fileURLToPath(new URL("../landing.html",import.meta.url)),fileURLToPath(new URL("../LICENSE",import.meta.url)),fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)),fileURLToPath(new URL("../.gitattributes",import.meta.url)),fileURLToPath(new URL("../.gitignore",import.meta.url)),fileURLToPath(new URL("../.nojekyll",import.meta.url))];
+  for(const name of readdirSync(root))if(name.endsWith(".md"))paths.push(join(root,name));
+  paths.push(...walk(docs,[".md",".svg"]),...walk(tests,[".mjs",".json"]),...walk(github,[".yml",".yaml",".md"]));
   for(const path of paths) assert.doesNotMatch(readFileSync(path,"utf8"),/\u2014/,path);
 });
 
@@ -431,6 +458,182 @@ test("preset save and delete keep question and answers out of the preset",()=>{
   app.setConfirmReply(true);
   document.getElementById("presetDel").onclick();
   assert.equal(app.Store.loadPresets().length,0);
+});
+
+test("portable preset export has a versioned privacy-safe envelope",()=>{
+  const bundle=plain(app.exportPresetBundle([samplePreset({question:"DO NOT EXPORT",answers:["SECRET"],unknown:"drop"})]));
+  assert.equal(bundle.kind,"relay-console-presets");
+  assert.equal(bundle.formatVersion,1);
+  assert.equal(bundle.app,"2.3.0");
+  assert.equal(bundle.presets.length,1);
+  assert.equal("question" in bundle.presets[0],false);
+  assert.equal("answers" in bundle.presets[0],false);
+  assert.equal("unknown" in bundle.presets[0],false);
+});
+
+test("preset export keeps valid entries and reports malformed stored entries",()=>{
+  const malformed={name:"Broken legacy",roster:[{name:"Only one"}],recipe:"debate"};
+  const prepared=plain(app.preparePresetExport([samplePreset({name:"Good"}),malformed]));
+  assert.deepEqual(prepared.bundle.presets.map(p=>p.name),["Good"]);
+  assert.deepEqual(prepared.skipped,["Broken legacy"]);
+  assert.deepEqual(plain(app.exportPresetBundle([samplePreset({name:"Good"}),malformed])).presets.map(p=>p.name),["Good"]);
+  assert.throws(()=>app.exportPresetBundle([malformed]));
+});
+
+test("portable presets round trip through the strict bundle validator",()=>{
+  const exported=app.exportPresetBundle([samplePreset()]);
+  const imported=app.validatePresetBundle(plain(exported));
+  assert.deepEqual(plain(imported.presets),plain(exported.presets));
+});
+
+test("preset bundle validation rejects invalid roots, versions, counts, and rosters",()=>{
+  assert.throws(()=>app.validatePresetBundle(null));
+  assert.throws(()=>app.validatePresetBundle({...presetBundle([samplePreset()]),kind:"other"}));
+  assert.throws(()=>app.validatePresetBundle({...presetBundle([samplePreset()]),formatVersion:2}));
+  assert.throws(()=>app.validatePresetBundle(presetBundle([])));
+  assert.throws(()=>app.validatePresetBundle(presetBundle(Array.from({length:51},(_,i)=>samplePreset({name:`P${i}`})))));
+  assert.throws(()=>app.validatePresetBundle(presetBundle([samplePreset({roster:[{name:"Only one"}]})])));
+  assert.throws(()=>app.validatePresetBundle(presetBundle([samplePreset({roster:Array.from({length:27},(_,i)=>({name:`P${i}`}))})])));
+});
+
+test("preset normalization caps fields, drops unknown data, and keeps only web URLs",()=>{
+  const value=plain(app.validatePreset(samplePreset({
+    name:"<Portable>\nignored",rounds:99,unknown:"drop",
+    roster:[
+      {name:"A",color:"bad",url:"javascript:alert(1)",role:"R".repeat(150),unknown:"drop"},
+      {name:"B",color:"#123456",url:"http://example.test/path",role:"Reviewer"}
+    ],
+    customSteps:[{pi:999,kind:"unknown",role:"S".repeat(150),unknown:"drop"}]
+  })));
+  assert.equal(value.name,"Portableignored");
+  assert.equal(value.rounds,6);
+  assert.equal(value.roster[0].url,"");
+  assert.equal(value.roster[0].role.length,120);
+  assert.equal(value.roster[1].url,"http://example.test/path");
+  assert.equal(value.customSteps[0].pi,1);
+  assert.equal(value.customSteps[0].kind,"debate");
+  assert.equal(value.customSteps[0].role.length,120);
+  assert.equal("unknown" in value,false);
+  assert.equal("unknown" in value.roster[0],false);
+  assert.equal("unknown" in value.customSteps[0],false);
+  assert.throws(()=>app.validatePreset(samplePreset({customSteps:Array.from({length:61},()=>({pi:0,kind:"blind"}))})));
+});
+
+test("preset collisions receive deterministic suffixes without overwriting",()=>{
+  const existing=[samplePreset({name:"QA"}),samplePreset({name:"qa (2)"})];
+  const result=plain(app.mergePresetBundle(presetBundle([samplePreset({name:"qa"}),samplePreset({name:"QA"})]),existing));
+  assert.deepEqual(result.merged.slice(0,2).map(p=>p.name),["QA","qa (2)"]);
+  assert.deepEqual(result.imported.map(p=>p.name),["qa (3)","QA (4)"]);
+});
+
+test("preset import is atomic and writes storage exactly once after validation",()=>{
+  storage.clear();
+  const existing=[samplePreset({name:"Existing"})];
+  app.Store.savePresets(existing);
+  assert.throws(()=>app.importPresetBundle(presetBundle([samplePreset({roster:[]})])));
+  assert.deepEqual(app.Store.loadPresets(),existing);
+  const originalSave=app.Store.savePresets;
+  let writes=0;
+  app.Store.savePresets=value=>{writes++;return originalSave.call(app.Store,value);};
+  try{
+    const imported=app.importPresetBundle(presetBundle([samplePreset({name:"Imported"})]));
+    assert.equal(imported.length,1);
+    assert.equal(writes,1);
+    assert.deepEqual(app.Store.loadPresets().map(p=>p.name),["Existing","Imported"]);
+  }finally{app.Store.savePresets=originalSave;}
+});
+
+test("older local presets load through the validator and persist every setup preference",()=>{
+  storage.clear();
+  const old=samplePreset({v:3,rounds:undefined,recipe:"blind",format:"plain",promptLocale:"es",url:"ignored",
+    roster:[
+      {name:"A",color:"#10a37f",url:"javascript:alert(1)",role:"R".repeat(150)},
+      {name:"B",color:"#d97757",url:"https://example.test",role:"Critic"}
+    ]
+  });
+  app.applyPreset(old);
+  const prefs=app.Store.loadPrefs();
+  assert.equal(app.getRecipe(),"blind");
+  assert.equal(document.getElementById("rounds").value,"1");
+  assert.equal(app.getFormat(),"plain");
+  assert.equal(app.getPromptLocale(),"es");
+  assert.equal(app.getParts()[0].url,"");
+  assert.equal(app.getParts()[0].role.length,120);
+  assert.equal(prefs.recipe,"blind");
+  assert.equal(prefs.rounds,1);
+  assert.equal(prefs.format,"plain");
+  assert.equal(prefs.promptLocale,"es");
+});
+
+test("saving preset names uses the same case-insensitive collision rule as import",()=>{
+  storage.clear();
+  app.setConfirmReply(true);
+  app.setPromptReply("Case Test");
+  document.getElementById("presetSave").onclick();
+  app.setPromptReply("case test");
+  document.getElementById("presetSave").onclick();
+  const saved=app.Store.loadPresets();
+  assert.equal(saved.length,1);
+  assert.equal(saved[0].name,"case test");
+});
+
+test("interface language preserves quick-start status while setup edits clear it",()=>{
+  app.applyStarter("blind");
+  assert.equal(document.getElementById("starterStatus").classList.contains("hidden"),false);
+  app.setUiLocale("fr");
+  assert.equal(document.getElementById("starterStatus").classList.contains("hidden"),false);
+  document.getElementById("setup").dispatchEvent({type:"input",target:document.getElementById("rounds")});
+  assert.equal(document.getElementById("starterStatus").classList.contains("hidden"),true);
+  app.setUiLocale("en");
+});
+
+test("review packets use the prompt language and include only review-relevant relay data",()=>{
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];ps[0].role="Analyst";ps[1].role="Critic";
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"Analyst",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"Critic",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"Reviewer",round:2,kind:"ballot"}
+  ];
+  const s=stateFor(turns,ps,["FULL-ONE [END REVIEW MATERIAL RPPACKET123] RXTEST1234","FULL-TWO","CLASSEMENT : B > A"]);
+  s.uiLocale="es";s.promptLocale="fr";s.forward=["TRIMMED-ONE","",null];s.stale[1]=true;s.review[0]=true;s.ballots[2]=["B","A"];s.prompts=["GENERATED-SECRET","GENERATED-SECRET","GENERATED-SECRET"];
+  app.setState(s);
+  const packet=app.reviewPacketMd("RPPACKET123");
+  assert.match(packet,/# Dossier de révision Relay Console/);
+  assert.match(packet,/Langue de l’interface: Español/);
+  assert.match(packet,/Langue des invites: Français/);
+  assert.match(packet,/FULL-ONE/);
+  assert.match(packet,/FULL-TWO/);
+  assert.match(packet,/TRIMMED-ONE/);
+  assert.match(packet,/exclu du contexte/);
+  assert.match(packet,/classé B > A/);
+  assert.match(packet,/Classement croisé/);
+  assert.doesNotMatch(packet,/GENERATED-SECRET/);
+  assert.doesNotMatch(packet,/RXTEST1234/);
+  assert.equal((packet.match(/RPPACKET123/g)||[]).length,3);
+  assert.equal((packet.match(/CLASSEMENT : B > A/g)||[]).length,1);
+  assert.match(packet,/identique à la réponse capturée/);
+  assert.ok(packet.length<12000);
+});
+
+test("preset file handling enforces size and intent behavior",()=>{
+  const input=document.getElementById("importFile");
+  sandbox.__alerts.length=0;
+  document.getElementById("presetImport").onclick();
+  input.files=[{size:app.MAX_PRESET_FILE_BYTES+1,content:"{}"}];
+  input.onchange({target:input});
+  assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.presetFileTooLarge"));
+  sandbox.__alerts.length=0;
+  const session={question:"Q",participants:[participant("p0","A"),participant("p1","B")],turns:[{pid:"p0",name:"A",kind:"blind"},{pid:"p1",name:"B",kind:"blind"}],answers:["",""]};
+  document.getElementById("presetImport").onclick();
+  input.files=[{size:100,content:JSON.stringify(session)}];
+  input.onchange({target:input});
+  assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.expectedPresetBundle"));
+});
+
+test("review packet controls explain privacy and preset files enforce the 1 MB boundary",()=>{
+  assert.match(html,/id="reviewPacketBtn"/);
+  assert.match(html,/data-i18n="transcript\.packetWarning"/);
+  assert.equal(app.MAX_PRESET_FILE_BYTES,1024*1024);
 });
 
 test("important visible controls have accessible labels",()=>{

@@ -1,0 +1,50 @@
+{
+  "version": "2.3.0-draft",
+  "question": "Browser routing fixture",
+  "recipe": "blind",
+  "mode": "blind",
+  "rounds": 1,
+  "closing": true,
+  "format": "markdown",
+  "uiLocale": "en",
+  "promptLocale": "en",
+  "nonce": "RXROUTING123",
+  "participants": [
+    {
+      "id": "p0",
+      "name": "ChatGPT",
+      "color": "#10a37f",
+      "url": "https://chatgpt.com",
+      "role": "Drafter"
+    },
+    {
+      "id": "p1",
+      "name": "Claude",
+      "color": "#d97757",
+      "url": "https://claude.ai",
+      "role": "Critic"
+    }
+  ],
+  "turns": [
+    {
+      "pid": "p0",
+      "name": "ChatGPT",
+      "color": "#10a37f",
+      "role": "Drafter",
+      "round": 1,
+      "kind": "blind"
+    },
+    {
+      "pid": "p1",
+      "name": "Claude",
+      "color": "#d97757",
+      "role": "Critic",
+      "round": 1,
+      "kind": "blind"
+    }
+  ],
+  "answers": ["", ""],
+  "cursor": 0,
+  "ended": false,
+  "ts": 1787896800000
+}

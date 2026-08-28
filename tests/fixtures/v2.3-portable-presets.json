@@ -1,0 +1,41 @@
+{
+  "kind": "relay-console-presets",
+  "formatVersion": 1,
+  "app": "2.3.0-draft",
+  "exported": "2026-08-28T00:00:00.000Z",
+  "presets": [
+    {
+      "v": 4,
+      "name": "Browser import QA",
+      "roster": [
+        {
+          "name": "ChatGPT",
+          "color": "#10a37f",
+          "url": "https://chatgpt.com",
+          "role": "Drafter",
+          "roleSet": true
+        },
+        {
+          "name": "Claude",
+          "color": "#d97757",
+          "url": "https://claude.ai",
+          "role": "Critic",
+          "roleSet": true
+        }
+      ],
+      "recipe": "dcr",
+      "customSteps": [
+        {
+          "pi": 0,
+          "kind": "blind",
+          "role": "",
+          "roleKey": "drafter"
+        }
+      ],
+      "rounds": 1,
+      "closing": true,
+      "format": "markdown",
+      "promptLocale": "en"
+    }
+  ]
+}
