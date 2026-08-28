@@ -1460,6 +1460,39 @@ test("the recovery bar announces itself and names its actions",()=>{
   assert.equal(status.textContent,"","hiding the recovery bar clears its announcement channel");
 });
 
+test("a translated recovery summary reaches the announcement channel",()=>{
+  // The suppression guard is a compound condition. The identity half is covered
+  // by the accessibility test above. This covers the text half: the checkpoint
+  // is unchanged, so only the rendered sentence differs, and the channel must
+  // still follow the interface language. Verified by removing that half of the
+  // guard, which leaves this test failing and the whole suite otherwise green.
+  storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
+  app.refreshRecoveryOffer(Date.now());
+  const status=document.getElementById("recoveryStatus");
+  app.captureRecovery(recoverableSession({question:"Translated summary"}),"restart",Date.now());
+  app.refreshRecoveryOffer(Date.now());
+  assert.match(status.textContent,/Kept from just before/,"starts in English");
+  assert.match(status.textContent,/Translated summary/);
+
+  let statusText=status.textContent,statusWrites=0;
+  Object.defineProperty(status,"textContent",{
+    configurable:true,
+    get(){return statusText;},
+    set(value){statusWrites++;statusText=String(value);}
+  });
+  try{ app.setUiLocale("fr",false); }
+  finally{ delete status.textContent;status.textContent=statusText; }
+
+  assert.equal(statusWrites,1,"an unchanged checkpoint with a new sentence must still be announced");
+  assert.match(status.textContent,/Conserv/,"the channel follows the interface language");
+  assert.match(status.textContent,/Translated summary/,"the question survives translation");
+  assert.doesNotMatch(status.textContent,/Kept from just before/,"no stale English text remains");
+
+  app.setUiLocale("en",false);
+  assert.match(status.textContent,/Kept from just before/,"and it follows back");
+  storage.clear();app.setState(null);app.refreshRecoveryOffer(Date.now());app.resetSaveStatus();
+});
+
 test("standalone privacy boundary remains intact",()=>{
   assert.match(html,/connect-src 'none'/);
   assert.doesNotMatch(html,/<script[^>]+src=/i);
