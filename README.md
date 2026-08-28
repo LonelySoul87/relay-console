@@ -80,7 +80,12 @@ Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles an
 - **Roles and reordering.** Give a model a job (skeptic, evidence checker, implementer) and set the running order.
 - **Curated context.** Each answer keeps its captured original; you can trim or drop what gets forwarded to later models without altering the record.
 - **Editable prompts** that persist per turn, with a live token estimate.
-- **Presets.** Save a roster plus settings under a name and reload it in one click.
+- **Portable presets.** Save a roster plus settings under a name, export up to
+  50 presets as a privacy-safe JSON bundle, and import them on another browser
+  or computer without including questions or answers.
+- **Review packets.** Export a compact Markdown handoff for independent review
+  with captured answers, context decisions, warnings, roles, and ballot results,
+  without duplicating generated prompts.
 - **Collision-proof framing.** Quoted answers are fenced with a per-session token so pasted text can't break the prompt structure.
 - **Response-format control.** Markdown, plain prose, or a verbatim code block (the reliable way to move a table between models).
 - **Peer ballots and scoreboard.** In Ballot panel, assistants rank anonymized
@@ -122,7 +127,7 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v2.2.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
+Each release is a self-contained file named by version (for example `relay-console-v2.3.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
 
 ## Verify a download
 

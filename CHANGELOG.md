@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.3.0 draft
+## v2.3.0
 
 Development release focused on portable workflows and safer independent review
 handoffs.

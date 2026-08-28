@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {existsSync,readFileSync,readdirSync} from "node:fs";
 import {join} from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import {fileURLToPath} from "node:url";
 
-const htmlPath=fileURLToPath(new URL("../relay-console-v2.3.0-draft.html",import.meta.url));
+const htmlPath=fileURLToPath(new URL("../relay-console-v2.3.0.html",import.meta.url));
 const html=readFileSync(htmlPath,"utf8");
 const scriptStart=html.indexOf("<script>")+8;
 const scriptEnd=html.lastIndexOf("</script>");
@@ -84,7 +85,7 @@ globalThis.__relayTest={
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
 };`;
-vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.3.0-draft.html"});
+vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.3.0.html"});
 const app=sandbox.__relayTest;
 
 function participant(id,name){return {id,name,color:"#10a37f",url:"",role:""};}
@@ -106,17 +107,30 @@ function stateFor(turns,participants,answers){
   };
 }
 
-test("v2.3 draft JavaScript loads in a minimal browser environment",()=>{
+test("v2.3 release JavaScript loads in a minimal browser environment",()=>{
   assert.equal(typeof app.parseBallot,"function");
   assert.equal(app.MAX_PARTICIPANTS,26);
-  assert.match(html,/<title>Relay Console v2\.3\.0 draft<\/title>/);
-  assert.match(html,/const VERSION="2\.3\.0-draft";/);
-  assert.match(html,/<span class="ver">v2\.3\.0 draft<\/span>/);
+  assert.match(html,/<title>Relay Console v2\.3\.0<\/title>/);
+  assert.match(html,/const VERSION="2\.3\.0";/);
+  assert.match(html,/<span class="ver">v2\.3\.0<\/span>/);
+  assert.doesNotMatch(html,/v2\.3\.0 draft|2\.3\.0-draft/);
   assert.doesNotMatch(html,/v2\.2\.0/);
   assert.match(html,/id="uiLocale"/);
   assert.match(html,/id="promptLocale"/);
   assert.match(html,/registerLocale\("es","Español",ES\)/);
   assert.match(html,/data-starter="dcr"/);
+  assert.deepEqual(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url))),readFileSync(htmlPath));
+  const sums=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)),"utf8");
+  const expectedFiles=["relay-console-v1.8.2.html","relay-console-v1.8.3.html","relay-console-v1.8.4.html","relay-console-v1.9.0.html","relay-console-v2.0.0.html","relay-console-v2.1.0.html","relay-console-v2.2.0.html","relay-console-v2.3.0.html"];
+  const sumLines=sums.trim().split(/\r?\n/);
+  assert.equal(sumLines.length,expectedFiles.length);
+  for(const [i,line] of sumLines.entries()){
+    const match=line.match(/^([0-9a-f]{64})  (relay-console-v[0-9.]+\.html)$/);
+    assert.ok(match,line);
+    assert.equal(match[2],expectedFiles[i]);
+    const releaseBytes=readFileSync(fileURLToPath(new URL(`../${match[2]}`,import.meta.url)));
+    assert.equal(createHash("sha256").update(releaseBytes).digest("hex"),match[1],match[2]);
+  }
   assert.match(html,/el\.innerHTML=t\(el\.dataset\.i18nHtml/);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
 });
@@ -130,9 +144,9 @@ test("all active product, planning, and repository text contains no em dashes",(
     const path=join(dir,entry.name);
     return entry.isDirectory()?walk(path,extensions):(extensions.some(ext=>entry.name.endsWith(ext))?[path]:[]);
   });
-  const paths=[htmlPath,fileURLToPath(new URL("../index.html",import.meta.url)),fileURLToPath(new URL("../landing.html",import.meta.url))];
+  const paths=[htmlPath,fileURLToPath(new URL("../index.html",import.meta.url)),fileURLToPath(new URL("../landing.html",import.meta.url)),fileURLToPath(new URL("../LICENSE",import.meta.url)),fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)),fileURLToPath(new URL("../.gitattributes",import.meta.url)),fileURLToPath(new URL("../.gitignore",import.meta.url)),fileURLToPath(new URL("../.nojekyll",import.meta.url))];
   for(const name of readdirSync(root))if(name.endsWith(".md"))paths.push(join(root,name));
-  paths.push(...walk(docs,[".md"]),...walk(tests,[".mjs",".json"]),...walk(github,[".yml",".yaml",".md"]));
+  paths.push(...walk(docs,[".md",".svg"]),...walk(tests,[".mjs",".json"]),...walk(github,[".yml",".yaml",".md"]));
   for(const path of paths) assert.doesNotMatch(readFileSync(path,"utf8"),/\u2014/,path);
 });
 
@@ -450,7 +464,7 @@ test("portable preset export has a versioned privacy-safe envelope",()=>{
   const bundle=plain(app.exportPresetBundle([samplePreset({question:"DO NOT EXPORT",answers:["SECRET"],unknown:"drop"})]));
   assert.equal(bundle.kind,"relay-console-presets");
   assert.equal(bundle.formatVersion,1);
-  assert.equal(bundle.app,"2.3.0-draft");
+  assert.equal(bundle.app,"2.3.0");
   assert.equal(bundle.presets.length,1);
   assert.equal("question" in bundle.presets[0],false);
   assert.equal("answers" in bundle.presets[0],false);
