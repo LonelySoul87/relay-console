@@ -8,6 +8,16 @@ lost by accident**.
 
 ### Added
 
+- **Bounded local recovery.** Before a restart, a saved-relay discard, or an
+  imported session replacing your work, Relay Console keeps one local recovery
+  copy. Restore and Remove are both offered directly, and the copy is removed
+  automatically after seven days.
+- **Honest autosave status.** The relay shows the time of the last successful
+  local save. A failed save stays visibly failed until a save succeeds, and never
+  reports a newer time than the last one that actually worked.
+- **Storage visibility.** The presets panel reports how much browser storage
+  Relay Console is using in total and for the session, presets, and recovery
+  copy, with specific guidance when space runs short.
 - **Import review before apply.** Session files and portable preset bundles are
   validated and summarized before any active relay or local preset data changes.
 - **Session import details.** The review shows version, participants, turns,
@@ -38,6 +48,16 @@ lost by accident**.
   users encounter the summary before either action.
 - Loading or importing a preset with more than 26 participants once again shows
   the specific participant-limit explanation.
+- A relay larger than one megabyte is refused as a recovery copy rather than
+  being shortened, and the refusal says to use Save file instead.
+- A recovery copy is validated through the same session validator as any import
+  before it can be restored, and unusable or expired data is dropped on sight.
+
+### Privacy
+
+- Discarded or replaced work can now remain in local browser storage for up to
+  seven days unless you remove it. The footer privacy note states this in
+  English, French, and Spanish. Nothing is ever uploaded.
 
 ## v2.3.0
 

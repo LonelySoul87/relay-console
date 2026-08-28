@@ -83,6 +83,13 @@ globalThis.__relayTest={
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
+  recoveryRecord,recoverySize,recoveryExpired,recoveryExpiresAt,readRecovery,captureRecovery,captureBeforeDestructive,
+  refreshRecoveryOffer,restoreRecovery,removeRecovery,renderRecoveryBar,renderStorageReport,renderSaveStatus,saveState,formatBytes,
+  RECOVERY_VERSION,RECOVERY_MAX_BYTES,RECOVERY_MAX_AGE_MS,STORAGE_SOFT_LIMIT,
+  setResumeOffer(value){resumeOffer=value;},getResumeOffer(){return resumeOffer;},
+  getRecoveryOffer(){return recoveryOffer;},
+  resetSaveStatus(){lastSaveOk=null;lastSaveAt=null;renderSaveStatus();},
+  getSaveStatus(){return {ok:lastSaveOk,at:lastSaveAt};},
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
 };`;
@@ -821,6 +828,287 @@ test("Spanish transcript export localizes app labels without changing captured a
   assert.match(md,/\*\*Pregunta:\*\* QUESTION-RAW/);
   assert.match(md,/CAPTURED-VERBATIM/);
   app.setState(null);app.setUiLocale("en");
+});
+
+/* ---------- bounded recovery checkpoint and autosave confidence (v2.4) ----------
+   Every expiry assertion below passes an explicit timestamp. Nothing here reads
+   the real clock, so the suite cannot drift or flake with wall time. */
+const DAY=24*60*60*1000;
+const T0=1756339200000;                       // fixed reference instant for every recovery test
+function recoverableSession(overrides={}){
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"blind"}
+  ];
+  const s=stateFor(turns,ps,["captured answer",""]);
+  s.question="Recoverable question";
+  return Object.assign(s,overrides);
+}
+function emptySession(){
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[{pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"}];
+  const s=stateFor(turns,ps,[""]);
+  s.question="";s.cursor=0;s.ended=false;
+  return s;
+}
+
+test("a recovery checkpoint captures meaningful work and restores through the session validator",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  assert.equal(app.captureRecovery(recoverableSession(),"restart",T0),"saved");
+  const stored=app.Store.loadRecovery();
+  assert.equal(stored.v,app.RECOVERY_VERSION);
+  assert.equal(stored.savedAt,T0);
+  assert.equal(stored.reason,"restart");
+  const offer=app.readRecovery(T0+DAY);
+  assert.ok(offer);
+  assert.equal(offer.reason,"restart");
+  assert.equal(offer.session.question,"Recoverable question");
+  assert.equal(offer.session.answers[0],"captured answer");
+  app.refreshRecoveryOffer(T0+DAY);
+  assert.equal(document.getElementById("recoveryBar").classList.contains("hidden"),false);
+  assert.match(document.getElementById("recoveryMsg").children[0].textContent,/Recoverable question/);
+  assert.equal(app.restoreRecovery(),true);
+  assert.equal(app.getState().question,"Recoverable question");
+  assert.equal(app.Store.loadRecovery(),null);                 // restoring consumes the slot
+  assert.equal(document.getElementById("recoveryBar").classList.contains("hidden"),true);
+  app.setState(null);
+});
+
+test("the recovery slot never accumulates and always holds the latest capture",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  app.captureRecovery(recoverableSession({question:"first"}),"restart",T0);
+  app.captureRecovery(recoverableSession({question:"second"}),"discard",T0+1000);
+  const raw=JSON.parse(localStorage.getItem("relayConsole.recovery.v1"));
+  assert.equal(Array.isArray(raw),false);
+  assert.equal(raw.session.question,"second");
+  assert.equal(raw.reason,"discard");
+  assert.equal([...storage.keys()].filter(k=>k.startsWith("relayConsole.recovery")).length,1);
+});
+
+test("a recovery checkpoint expires after exactly seven days",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  app.captureRecovery(recoverableSession(),"replace",T0);
+  const record=app.Store.loadRecovery();
+  assert.equal(app.RECOVERY_MAX_AGE_MS,7*DAY);
+  assert.equal(app.recoveryExpiresAt(record),T0+7*DAY);
+  assert.equal(app.recoveryExpired(record,T0+7*DAY),false);        // exactly seven days is still valid
+  assert.equal(app.recoveryExpired(record,T0+7*DAY+1),true);
+  assert.ok(app.readRecovery(T0+7*DAY));
+  assert.equal(app.readRecovery(T0+7*DAY+1),null);
+  assert.equal(app.refreshRecoveryOffer(T0+7*DAY+1),null);
+  assert.equal(app.Store.loadRecovery(),null);                     // an expired slot is dropped on sight
+  assert.equal(document.getElementById("recoveryBar").classList.contains("hidden"),true);
+});
+
+test("unusable recovery data is rejected instead of restored",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  const good=app.recoveryRecord(recoverableSession(),"restart",T0);
+  assert.ok(app.readRecovery(T0,good));
+  assert.equal(app.readRecovery(T0,null),null);
+  assert.equal(app.readRecovery(T0,"not an object"),null);
+  assert.equal(app.readRecovery(T0,[good]),null);
+  assert.equal(app.readRecovery(T0,{...good,v:99}),null);
+  assert.equal(app.readRecovery(T0,{...good,savedAt:"soon"}),null);
+  assert.equal(app.readRecovery(T0,{...good,session:{turns:"nope"}}),null);
+  assert.equal(app.readRecovery(T0,{...good,session:{...good.session,participants:[participant("p0","Only")]}}),null);
+  localStorage.setItem("relayConsole.recovery.v1","{not json");
+  assert.equal(app.Store.loadRecovery(),null);
+  assert.equal(app.refreshRecoveryOffer(T0),null);
+});
+
+test("an oversize checkpoint is refused whole and never truncated",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  const big=recoverableSession();
+  big.answers[0]="X".repeat(app.RECOVERY_MAX_BYTES+2048);
+  assert.ok(app.recoverySize(app.recoveryRecord(big,"restart",T0))>app.RECOVERY_MAX_BYTES);
+  assert.equal(app.captureRecovery(big,"restart",T0),"oversize");
+  assert.equal(app.Store.loadRecovery(),null);                     // refused, so nothing at all is stored
+  sandbox.__alerts.length=0;
+  assert.equal(app.captureBeforeDestructive(big,"restart",T0),"oversize");
+  assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.recoveryTooLarge"));
+  assert.equal(app.Store.loadRecovery(),null);
+  const small=recoverableSession();
+  assert.equal(app.captureRecovery(small,"restart",T0),"saved");
+  assert.ok(app.recoverySize(app.Store.loadRecovery())<=app.RECOVERY_MAX_BYTES);
+});
+
+test("an empty relay produces no checkpoint at all",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  assert.equal(app.captureRecovery(emptySession(),"restart",T0),"skipped");
+  assert.equal(app.captureRecovery(null,"restart",T0),"skipped");
+  assert.equal(app.captureRecovery(undefined,"discard",T0),"skipped");
+  assert.equal(app.Store.loadRecovery(),null);
+  assert.equal(document.getElementById("recoveryBar").classList.contains("hidden"),true);
+});
+
+test("Remove clears the checkpoint immediately and Restore refuses when there is nothing kept",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  app.captureRecovery(recoverableSession(),"discard",T0);
+  app.refreshRecoveryOffer(T0);
+  assert.ok(app.getRecoveryOffer());
+  assert.equal(app.removeRecovery(),true);
+  assert.equal(app.Store.loadRecovery(),null);
+  assert.equal(app.getRecoveryOffer(),null);
+  assert.equal(document.getElementById("recoveryBar").classList.contains("hidden"),true);
+  assert.equal(app.restoreRecovery(),false);
+  app.setConfirmReply(false);
+  app.captureRecovery(recoverableSession(),"discard",T0);
+  app.refreshRecoveryOffer(T0);
+  assert.equal(document.getElementById("recoveryRemove").onclick(),false);
+  assert.ok(app.Store.loadRecovery());                             // declining the confirmation keeps it
+  app.setConfirmReply(true);
+  assert.equal(document.getElementById("recoveryRemove").onclick(),true);
+  assert.equal(app.Store.loadRecovery(),null);
+});
+
+test("destructive actions capture before they destroy, and skip when there is nothing to keep",()=>{
+  storage.clear();app.setResumeOffer(null);
+  const live=recoverableSession();
+  app.setState(live);app.Store.save(live);
+  app.setConfirmReply(true);
+  assert.equal(document.getElementById("restart").onclick(),true);
+  assert.equal(app.Store.load(),null);                             // the autosave slot really is cleared
+  const kept=app.readRecovery(T0);
+  assert.ok(kept);
+  assert.equal(kept.reason,"restart");
+  assert.equal(kept.session.question,"Recoverable question");
+
+  storage.clear();app.setState(null);
+  const saved=recoverableSession({question:"Saved relay"});
+  app.Store.save(saved);app.setResumeOffer(saved);
+  assert.equal(document.getElementById("discardBtn").onclick(),true);
+  assert.equal(app.Store.load(),null);
+  assert.equal(app.readRecovery(T0).reason,"discard");
+  assert.equal(app.readRecovery(T0).session.question,"Saved relay");
+
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  const raw={version:"2.3.0",question:"Incoming",recipe:"blind",
+    participants:[participant("p0","A"),participant("p1","B")],
+    turns:[{pid:"p0",name:"A",kind:"blind"},{pid:"p1",name:"B",kind:"blind"}],answers:["",""]};
+  app.setState(recoverableSession({question:"About to be replaced"}));
+  app.renderImportPreview(app.describeImport(raw,app.getState(),[]));
+  assert.equal(app.applyPendingImport(),true);
+  assert.equal(app.getState().question,"Incoming");
+  assert.equal(app.readRecovery(T0).reason,"replace");
+  assert.equal(app.readRecovery(T0).session.question,"About to be replaced");
+
+  storage.clear();app.setState(emptySession());app.setResumeOffer(null);
+  app.setConfirmReply(true);
+  document.getElementById("restart").onclick();
+  assert.equal(app.Store.loadRecovery(),null);                     // nothing meaningful, so no checkpoint
+  app.setState(null);
+});
+
+test("autosave status reports the last successful save and keeps failures visible",()=>{
+  storage.clear();app.setState(null);app.resetSaveStatus();
+  const status=document.getElementById("saveStatus");
+  assert.equal(status.classList.contains("hidden"),true);
+  app.setState(recoverableSession());
+  assert.equal(app.saveState(T0),true);
+  assert.deepEqual(plain(app.getSaveStatus()),{ok:true,at:T0});
+  assert.equal(status.classList.contains("hidden"),false);
+  assert.equal(status.classList.contains("failed"),false);
+  assert.match(status.textContent,/^Saved in this browser at /);
+  assert.equal(document.getElementById("storageWarn").classList.contains("hidden"),true);
+
+  const realSave=app.Store.save;
+  app.Store.save=()=>false;
+  try{
+    assert.equal(app.saveState(T0+60000),false);
+    assert.equal(app.getSaveStatus().ok,false);
+    assert.equal(app.getSaveStatus().at,T0);                       // a failure never advances the saved time
+    assert.equal(status.classList.contains("failed"),true);
+    assert.equal(status.textContent,app.tr("en","save.failed"));
+    assert.equal(document.getElementById("storageWarn").classList.contains("hidden"),false);
+    app.renderSaveStatus();
+    assert.equal(status.classList.contains("failed"),true);        // it stays failed until a save succeeds
+  }finally{app.Store.save=realSave;}
+  assert.equal(app.saveState(T0+120000),true);
+  assert.deepEqual(plain(app.getSaveStatus()),{ok:true,at:T0+120000});
+  assert.equal(status.classList.contains("failed"),false);
+  app.setState(null);app.resetSaveStatus();
+});
+
+test("storage reporting accounts for the recovery slot and offers actionable guidance",()=>{
+  storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
+  const report=document.getElementById("storageReport");
+  app.renderStorageReport();
+  const empty=app.Store.usage();
+  assert.equal(empty.total,0);
+  assert.equal(empty.recovery,0);
+  assert.equal(report.classList.contains("near"),false);
+
+  app.Store.savePresets([app.validatePreset(samplePreset({name:"Sized"}))]);
+  app.captureRecovery(recoverableSession(),"restart",T0);
+  const used=app.Store.usage();
+  assert.ok(used.recovery>0);
+  assert.ok(used.presets>0);
+  assert.equal(used.total,used.session+used.recovery+used.presets+used.roster+used.prefs+used.flags+used.draft);
+  app.renderStorageReport();
+  assert.match(report.children[0].textContent,/Relay Console storage: /);
+  assert.match(report.children[0].textContent,/recovery /);
+  assert.equal(report.classList.contains("near"),false);
+  assert.equal(report.children.length,1);                          // no quota advice while there is room
+
+  assert.equal(app.formatBytes(512),"512 B");
+  assert.equal(app.formatBytes(2048),"2.0 KB");
+  assert.equal(app.formatBytes(3*1024*1024),"3.00 MB");
+
+  const realUsage=app.Store.usage;
+  app.Store.usage=()=>({total:app.STORAGE_SOFT_LIMIT+1,session:1,recovery:1,presets:1,roster:0,prefs:0,flags:0,draft:0});
+  try{
+    app.renderStorageReport();
+    assert.equal(report.classList.contains("near"),true);
+    assert.equal(report.children.length,2);
+    assert.equal(report.children[1].textContent,app.tr("en","storage.quota"));
+  }finally{app.Store.usage=realUsage;}
+  storage.clear();app.renderStorageReport();
+});
+
+test("recovery and storage copy is complete and honest in all three languages",()=>{
+  const keys=["recovery.restore","recovery.remove","recovery.message","recovery.expiry","recovery.noQuestion",
+    "recovery.reason.restart","recovery.reason.discard","recovery.reason.replace",
+    "save.ok","save.failed","storage.total","storage.quota","storage.unavailable",
+    "storage.bytes","storage.kilobytes","storage.megabytes",
+    "confirm.removeRecovery","alert.recoveryTooLarge"];
+  for(const locale of app.SUPPORTED_LOCALES){
+    for(const key of keys){
+      const value=app.I18N[locale][key];
+      assert.equal(typeof value,"string",locale+" "+key);
+      assert.ok(value.trim().length>0,locale+" "+key);
+      assert.doesNotMatch(value,/\u2014/,locale+" "+key);
+    }
+    // the privacy footer must state the seven day window in every language
+    assert.match(app.I18N[locale]["footer.privacy"],/7|sept|siete|seven/i,locale);
+  }
+  assert.match(app.I18N.en["footer.privacy"],/up to seven days/);
+  assert.match(app.I18N.fr["footer.privacy"],/sept jours/);
+  assert.match(app.I18N.es["footer.privacy"],/siete d\u00edas/);
+  app.setUiLocale("fr",false);
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  app.captureRecovery(recoverableSession(),"discard",T0);
+  app.refreshRecoveryOffer(T0);
+  assert.match(document.getElementById("recoveryMsg").children[0].textContent,/relais enregistr\u00e9/);
+  assert.match(document.getElementById("recoveryMsg").children[1].textContent,/Relay Console supprime/);
+  app.setUiLocale("en",false);
+  storage.clear();app.refreshRecoveryOffer(T0);
+});
+
+test("recovery and storage surfaces stay announced and stay inside a narrow screen",()=>{
+  // Structural checks. The interactive browser pass is recorded separately in
+  // docs/v2.4.0-progress.md; these assertions lock what that pass verified.
+  assert.match(html,/<p id="saveStatus" class="savestatus hidden" role="status" aria-live="polite">/);
+  assert.match(html,/id="recoveryRestore" data-i18n="recovery\.restore"/);
+  assert.match(html,/id="recoveryRemove" data-i18n="recovery\.remove"/);
+  assert.match(html,/<p class="storagereport" id="storageReport">/);
+  for(const rule of [/\.recovery \.msg\{[^}]*overflow-wrap:anywhere/,/\.storagereport\{[^}]*overflow-wrap:anywhere/,/\.savestatus\{[^}]*overflow-wrap:anywhere/])
+    assert.match(html,rule,String(rule));
+  assert.match(html,/\.recovery\{[^}]*flex-wrap:wrap/);
+  assert.match(html,/\.savestatus\{[^}]*flex-wrap:wrap/);
+  // The recovery bar sits outside both panels so it survives the setup and run switch.
+  const bar=html.indexOf('id="recoveryBar"'), setup=html.indexOf('<div id="setup">'), run=html.indexOf('<div id="run"');
+  assert.ok(bar>0&&bar<setup&&bar<run);
 });
 
 test("standalone privacy boundary remains intact",()=>{
