@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.4.0 draft
+
+Development draft focused on safer file workflows, faster navigation, recovery,
+accessibility, and deeper everyday polish. The final scope remains under joint
+ChatGPT and Claude review.
+
 ## v2.3.0
 
 Feature release focused on portable workflows and safer independent review

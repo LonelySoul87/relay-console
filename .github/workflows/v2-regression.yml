@@ -41,4 +41,4 @@ jobs:
         with:
           node-version: 24
       - name: Run standalone regression suites
-        run: node --test tests/relay-console-v2.test.mjs tests/relay-console-v2.1.test.mjs tests/relay-console-v2.2.test.mjs tests/relay-console-v2.3.test.mjs
+        run: node --test
