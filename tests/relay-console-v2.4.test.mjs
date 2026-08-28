@@ -1467,10 +1467,10 @@ test("a translated recovery summary reaches the announcement channel",()=>{
   // still follow the interface language. Verified by removing that half of the
   // guard, which leaves this test failing and the whole suite otherwise green.
   storage.clear();app.setState(null);app.setResumeOffer(null);app.resetSaveStatus();
-  app.refreshRecoveryOffer(Date.now());
+  app.refreshRecoveryOffer(T0);app.setUiLocale("en",false);
   const status=document.getElementById("recoveryStatus");
-  app.captureRecovery(recoverableSession({question:"Translated summary"}),"restart",Date.now());
-  app.refreshRecoveryOffer(Date.now());
+  app.captureRecovery(recoverableSession({question:"Translated summary"}),"restart",T0);
+  app.refreshRecoveryOffer(T0);
   assert.match(status.textContent,/Kept from just before/,"starts in English");
   assert.match(status.textContent,/Translated summary/);
 
@@ -1490,7 +1490,7 @@ test("a translated recovery summary reaches the announcement channel",()=>{
 
   app.setUiLocale("en",false);
   assert.match(status.textContent,/Kept from just before/,"and it follows back");
-  storage.clear();app.setState(null);app.refreshRecoveryOffer(Date.now());app.resetSaveStatus();
+  storage.clear();app.setState(null);app.refreshRecoveryOffer(T0);app.resetSaveStatus();
 });
 
 test("standalone privacy boundary remains intact",()=>{
