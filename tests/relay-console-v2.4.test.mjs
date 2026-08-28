@@ -91,6 +91,7 @@ globalThis.__relayTest={
   setResumeOffer(value){resumeOffer=value;},getResumeOffer(){return resumeOffer;},
   getRecoveryOffer(){return recoveryOffer;},
   getConsumeRecoveryToken(){return consumeRecoveryToken;},
+  showPresetStatus,miniCopy,download,
   resetStorageReportScheduler(){storageReportPending=false;},
   resetSaveStatus(){lastSaveOk=null;lastSaveAt=null;renderSaveStatus();},
   getSaveStatus(){return {ok:lastSaveOk,at:lastSaveAt};},
@@ -1311,6 +1312,50 @@ test("the storage report is not recomputed on every keystroke",()=>{
       assert.ok(!body.includes("renderStorageReport()"),fn+" must not render directly");
     }
   }finally{app.Store.usage=realUsage;sandbox.__timers.length=0;app.resetStorageReportScheduler();}
+  storage.clear();
+});
+
+test("every deferred callback still runs cleanly, and the preset status really clears",()=>{
+  // The deterministic timer queue is the right call, but it also means nothing
+  // executes the app's five other deferred callbacks any more. Drain them here
+  // so a throwing callback cannot pass unnoticed, and assert the one visible
+  // outcome the suite never checked: the preset status auto-clear and its
+  // sequence guard.
+  storage.clear();app.setState(null);app.setResumeOffer(null);
+  sandbox.__timers.length=0;app.resetStorageReportScheduler();
+  const status=document.getElementById("presetStatus");
+
+  app.showPresetStatus("first message");
+  assert.equal(status.textContent,"first message");
+  assert.equal(status.classList.contains("hidden"),false);
+  const first=sandbox.__timers.filter(timer=>timer.delay===6000);
+  assert.equal(first.length,1,"a status message schedules exactly one clear");
+
+  app.showPresetStatus("second message");
+  assert.equal(status.textContent,"second message");
+  first[0].callback();                                        // the stale clear must not fire
+  assert.equal(status.textContent,"second message","an older timer must not clear a newer message");
+  assert.equal(status.classList.contains("hidden"),false);
+
+  const second=sandbox.__timers.filter(timer=>timer.delay===6000&&timer.id!==first[0].id);
+  assert.equal(second.length,1);
+  second[0].callback();
+  assert.equal(status.textContent,"","the current timer clears the message");
+  assert.equal(status.classList.contains("hidden"),true);
+
+  // Exercise the remaining deferred paths and drain everything that is pending.
+  sandbox.__timers.length=0;
+  app.download("audit.md","body","text/markdown");
+  app.miniCopy(document.getElementById("copyMdBtn"),"text","idle");
+  app.showPresetStatus("draining");
+  const pending=sandbox.__timers.slice();
+  assert.ok(pending.length>=2,"expected deferred callbacks to be queued, saw "+pending.length);
+  const failures=[];
+  for(const timer of pending){
+    try{ timer.callback(); }catch(err){ failures.push(timer.delay+"ms: "+(err&&err.message)); }
+  }
+  assert.deepEqual(failures,[],"no deferred callback may throw");
+  sandbox.__timers.length=0;app.resetStorageReportScheduler();
   storage.clear();
 });
 
