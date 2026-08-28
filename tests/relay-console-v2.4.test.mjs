@@ -1390,18 +1390,22 @@ test("the recovery bar announces itself and names its actions",()=>{
   app.setConfirmReply(true);
   const message=document.getElementById("recoveryMsg");
   const status=document.getElementById("recoveryStatus");
-  let statusText=status.textContent,statusWrites=0;
+  let statusText=status.textContent,statusWrites=0,statusChanges=0;
   Object.defineProperty(status,"textContent",{
     configurable:true,
     get(){return statusText;},
-    set(value){const next=String(value);if(next!==statusText)statusWrites++;statusText=next;}
+    set(value){const next=String(value);statusWrites++;if(next!==statusText)statusChanges++;statusText=next;}
   });
   try{assert.equal(document.getElementById("restart").onclick(),true);}
   finally{delete status.textContent;status.textContent=statusText;}
   assert.equal(bar.classList.contains("hidden"),false,"the bar arrives from a user action");
   assert.ok(message.children.length>0);
   assert.match(status.textContent,/Work in progress/);
-  assert.equal(statusWrites,1,"the setup re-render must not repeat an unchanged announcement");
+  assert.equal(statusChanges,1,"one user action produces one announcement");
+  // Every assignment is counted, not only the ones that change the value. A
+  // browser treats an identical reassignment as a DOM mutation and a live
+  // region announces it again, so the guard in renderRecoveryBar has to hold.
+  assert.equal(statusWrites,1,"the setup re-render must not touch the live region at all");
 
   // The always-rendered status is outside the hidden visual banner, so it is
   // present in the accessibility tree before any message is injected.
