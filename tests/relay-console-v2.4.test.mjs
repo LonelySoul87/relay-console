@@ -1388,17 +1388,31 @@ test("the recovery bar announces itself and names its actions",()=>{
   app.setState(live);app.Store.save(live);
   assert.equal(bar.classList.contains("hidden"),true,"hidden before the destructive action");
   app.setConfirmReply(true);
-  assert.equal(document.getElementById("restart").onclick(),true);
+  const message=document.getElementById("recoveryMsg");
+  const status=document.getElementById("recoveryStatus");
+  let statusText=status.textContent,statusWrites=0;
+  Object.defineProperty(status,"textContent",{
+    configurable:true,
+    get(){return statusText;},
+    set(value){const next=String(value);if(next!==statusText)statusWrites++;statusText=next;}
+  });
+  try{assert.equal(document.getElementById("restart").onclick(),true);}
+  finally{delete status.textContent;status.textContent=statusText;}
   assert.equal(bar.classList.contains("hidden"),false,"the bar arrives from a user action");
-  assert.ok(document.getElementById("recoveryMsg").children.length>0);
+  assert.ok(message.children.length>0);
+  assert.match(status.textContent,/Work in progress/);
+  assert.equal(statusWrites,1,"the setup re-render must not repeat an unchanged announcement");
 
-  // The message is the live region. The buttons stay outside it so a re-render
-  // does not re-announce their labels.
-  assert.match(html,/<span class="msg" id="recoveryMsg" role="status" aria-live="polite"><\/span>/);
+  // The always-rendered status is outside the hidden visual banner, so it is
+  // present in the accessibility tree before any message is injected.
+  assert.match(html,/<span class="msg" id="recoveryMsg"><\/span>[\s\S]*?<\/div>\s*<\/div>\s*<span class="sr-only" id="recoveryStatus" role="status" aria-live="polite" aria-atomic="true"><\/span>/);
+  const srRule=html.match(/\.sr-only\{([^}]+)\}/);
+  assert.ok(srRule,"the visually hidden utility must exist");
+  assert.doesNotMatch(srRule[1],/display\s*:\s*none|visibility\s*:\s*hidden/,
+    "the announcement channel must remain in the accessibility tree");
+  assert.match(srRule[1],/clip(?:-path)?\s*:/,"the announcement channel stays visually hidden");
   assert.match(html,/id="recoveryRestore"[^>]*data-i18n-aria="recovery\.restoreAria"/);
   assert.match(html,/id="recoveryRemove"[^>]*data-i18n-aria="recovery\.removeAria"/);
-  // The exact-match regex above already proves the live region is an empty span,
-  // so no control can sit inside it.
 
   for(const locale of app.SUPPORTED_LOCALES){
     for(const key of ["recovery.restoreAria","recovery.removeAria"]){
@@ -1409,7 +1423,10 @@ test("the recovery bar announces itself and names its actions",()=>{
       assert.doesNotMatch(value,/\u2014/,locale+" "+key);
     }
   }
-  storage.clear();app.setState(null);app.resetSaveStatus();
+  storage.clear();app.setState(null);app.refreshRecoveryOffer(Date.now());app.resetSaveStatus();
+  assert.equal(bar.classList.contains("hidden"),true);
+  assert.equal(message.children.length,0,"hiding the recovery bar removes its stale announcement");
+  assert.equal(status.textContent,"","hiding the recovery bar clears its announcement channel");
 });
 
 test("standalone privacy boundary remains intact",()=>{

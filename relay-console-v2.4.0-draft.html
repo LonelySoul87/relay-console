@@ -144,6 +144,7 @@
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .spread{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
   .hidden{display:none!important}
+  .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;clip-path:inset(50%)!important;white-space:nowrap!important;border:0!important}
 
   .resume{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--signal);box-shadow:0 0 0 3px var(--focus-ring);border-radius:12px;padding:13px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
   .resume .msg{font-size:13.5px;line-height:1.6;flex:1 1 240px;min-width:0;overflow-wrap:anywhere}
@@ -366,12 +367,14 @@
   </div>
 
   <div id="recoveryBar" class="recovery hidden">
-    <span class="msg" id="recoveryMsg" role="status" aria-live="polite"></span>
+    <span class="msg" id="recoveryMsg"></span>
     <div class="row">
       <button class="btn" id="recoveryRestore" data-i18n="recovery.restore" data-i18n-aria="recovery.restoreAria">Restore</button>
       <button class="ghost" id="recoveryRemove" data-i18n="recovery.remove" data-i18n-aria="recovery.removeAria">Remove</button>
     </div>
   </div>
+
+  <span class="sr-only" id="recoveryStatus" role="status" aria-live="polite" aria-atomic="true"></span>
 
   <p id="saveStatus" class="savestatus hidden" role="status" aria-live="polite"></p>
 
@@ -993,11 +996,13 @@ function formatBytes(size){
 }
 function renderRecoveryBar(){
   const bar=$("recoveryBar"); if(!bar) return;
-  if(!recoveryOffer){ bar.classList.add("hidden"); return; }
+  const msg=$("recoveryMsg");
+  const status=$("recoveryStatus");
+  if(!recoveryOffer){ msg.innerHTML=""; if(status.textContent)status.textContent=""; bar.classList.add("hidden"); return; }
   const {record,session,reason}=recoveryOffer;
   const question=cleanText(session.question).trim();
   const answered=session.answers.filter(a=>cleanText(a).trim()).length;
-  const msg=$("recoveryMsg"); msg.innerHTML="";
+  msg.innerHTML="";
   const head=document.createElement("span");
   head.textContent=t("recovery.message",{
     reason:t("recovery.reason."+reason),
@@ -1008,6 +1013,8 @@ function renderRecoveryBar(){
   const note=document.createElement("span"); note.className="note";
   note.textContent=t("recovery.expiry",{when:new Date(recoveryExpiresAt(record)).toLocaleDateString(uiLocale)});
   msg.append(head,note);
+  const announcement=head.textContent+" "+note.textContent;
+  if(status.textContent!==announcement)status.textContent=announcement;
   bar.classList.remove("hidden");
 }
 function refreshRecoveryOffer(now){
