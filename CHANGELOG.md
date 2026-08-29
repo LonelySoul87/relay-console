@@ -87,6 +87,16 @@ lost by accident**.
 - A replacement recovery checkpoint is announced even when its visible summary
   happens to match the previous checkpoint.
 
+- The preset dropdown now always leaves a real preset selected, so Load, Rename,
+  Duplicate, Export selected, and Delete can never act on a preset the control is
+  not showing.
+- A failed preset delete now says that deleting failed, removes any success line,
+  and can name an unnamed entry by its position.
+- Preset names are compared one way everywhere, so a preset saved by an older
+  release cannot end up sharing an identity with a newer one.
+- Download filenames stay portable when a long name is truncated, and an unusable
+  date degrades to a marker rather than a broken stamp.
+
 ### Privacy
 
 - Discarded or replaced work can now remain in local browser storage for up to

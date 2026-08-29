@@ -25,10 +25,25 @@ class FakeClassList{
 class FakeElement{
   constructor(tag="div",id=""){
     this.tagName=tag.toUpperCase();this.id=id;this.children=[];this.style={};this.classList=new FakeClassList();
-    this.value="";this.checked=false;this.disabled=false;this.textContent="";this.dataset={};this.attributes={};this.open=false;this.focusCount=0;
+    this._value="";this.selectedIndex=-1;this.checked=false;this.disabled=false;this.textContent="";this.dataset={};this.attributes={};this.open=false;this.focusCount=0;
     this.offsetLeft=0;this.offsetWidth=0;this.clientWidth=0;this.parentNode=null;this.files=[];this.listeners={};
   }
-  set innerHTML(value){this._innerHTML=String(value);this.children=[];}
+  get options(){return this.children.filter(node=>node.tagName==="OPTION");}
+  // A real <select> only holds a value that matches one of its options.
+  set value(next){
+    if(this.tagName==="SELECT"){
+      const options=this.options;
+      if(options.length){
+        const at=options.findIndex(option=>option.value===String(next));
+        this.selectedIndex=at;
+        this._value=at<0?"":String(next);
+        return;
+      }
+    }
+    this._value=String(next);
+  }
+  get value(){return this._value===undefined?"":this._value;}
+  set innerHTML(value){this._innerHTML=String(value);this.children=[];if(this.tagName==="SELECT")this.selectedIndex=-1;}
   get innerHTML(){return this._innerHTML||"";}
   set className(value){this._className=String(value);this.classList=new FakeClassList();String(value).split(/\s+/).filter(Boolean).forEach(n=>this.classList.add(n));}
   get className(){return this._className||"";}
@@ -52,10 +67,12 @@ class FakeElement{
 
 const elements=new Map();
 const documentElement=new FakeElement("html","html");
+const SELECT_IDS=new Set(["presetSelect","uiLocale","promptLocale","recipeSel","format","synthPick",
+  "transcriptFilterParticipant","transcriptFilterKind","transcriptFilterRound","transcriptFilterState"]);
 const document={
   documentElement,
   body:new FakeElement("body","body"),
-  getElementById(id){if(!elements.has(id))elements.set(id,new FakeElement("div",id));return elements.get(id);},
+  getElementById(id){if(!elements.has(id))elements.set(id,new FakeElement(SELECT_IDS.has(id)?"select":"div",id));return elements.get(id);},
   createElement(tag){return new FakeElement(tag);},
   querySelectorAll(){return [];},
   addEventListener(){},
@@ -86,6 +103,7 @@ globalThis.__relayTest={
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
+  presetNameKey,selectedPresetIndex,exportFileToken,exportDateStamp,exportFilename,showExportStatus,
   recoveryRecord,recoverySize,recoveryExpired,recoveryExpiresAt,readRecovery,captureRecovery,captureBeforeDestructive,
   refreshRecoveryOffer,restoreRecovery,removeRecovery,renderRecoveryBar,renderStorageReport,renderSaveStatus,saveState,formatBytes,saveSetupDraft,scheduleStorageReport,storageBytes,RECOVERY_FUTURE_SKEW_MS,
   RECOVERY_VERSION,RECOVERY_MAX_BYTES,RECOVERY_MAX_AGE_MS,STORAGE_SOFT_LIMIT,
@@ -678,7 +696,10 @@ test("preset management writes once per successful action and keeps selection on
     document.getElementById("presetSelect").value="1";
     sandbox.__alerts.length=0;
     document.getElementById("presetDel").onclick();
-    assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.presetSaveFailed"));
+    assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.presetDeleteFailed"),
+      "a failed delete must name the operation the user actually attempted");
+    assert.equal(document.getElementById("presetStatus").textContent,"",
+      "a failed write must not leave a success line standing under the alert");
     assert.deepEqual(app.Store.loadPresets().map(p=>p.name),["Renamed","Renamed copy"]);
   }finally{app.Store.savePresets=failedSave;}
 });
@@ -1760,6 +1781,138 @@ test("a translated recovery summary reaches the announcement channel",()=>{
   app.setUiLocale("en",false);
   assert.match(status.textContent,/Kept from just before/,"and it follows back");
   storage.clear();app.setState(null);app.refreshRecoveryOffer(T0);app.resetSaveStatus();
+});
+
+test("the preset dropdown never leaves actions pointing at an unselected preset",()=>{
+  // Number("") is 0, so an empty select value used to pass every "valid index"
+  // guard. On a fresh load the control showed nothing selected while the summary
+  // and all five actions targeted preset 0, including Delete. Reproduced in a real
+  // browser: selectedIndex -1, yet Delete removed the first preset.
+  storage.clear();
+  app.Store.savePresets([samplePreset({name:"First"}),samplePreset({name:"Second"}),samplePreset({name:"Third"})]);
+  const dd=document.getElementById("presetSelect");
+  dd.innerHTML="";dd._value="";                    // the exact state boot starts from: no option ever chosen
+  app.renderPresets();                               // exactly what boot calls
+  assert.equal(dd.options.length,3);
+  assert.notEqual(dd.selectedIndex,-1,"a non-empty library must leave a real option selected");
+  assert.equal(dd.selectedIndex,0);
+  assert.equal(dd.value,"0");
+  assert.equal(app.selectedPresetIndex(),0,"what the control shows and what the actions read must agree");
+
+  // An empty or junk value must read as "nothing selected", never as index 0.
+  for(const junk of ["","   ","abc","-1","1.5","0x1"]){
+    dd._value=junk;                                  // bypass select semantics to force the hostile state
+    assert.equal(app.selectedPresetIndex(),-1,"value "+JSON.stringify(junk)+" must not resolve to an index");
+  }
+  dd.value="1";
+  assert.equal(app.selectedPresetIndex(),1);
+
+  // Deleting must act on the preset the control actually shows.
+  app.renderPresets();
+  dd.value="2";
+  app.setConfirmReply(true);
+  document.getElementById("presetDel").onclick();
+  assert.deepEqual(app.Store.loadPresets().map(p=>p.name),["First","Second"],"delete acts on the shown preset");
+  storage.clear();
+});
+
+test("a delete confirmation can always name the entry it is about to remove",()=>{
+  storage.clear();
+  app.Store.savePresets([samplePreset({name:"Named"}),{v:4,roster:[{name:"Only"}]},samplePreset({name:"Third"})]);
+  app.renderPresets(1);
+  const asked=[];
+  app.setConfirmReply(true);
+  const realConfirm=sandbox.confirm;
+  sandbox.confirm=message=>{asked.push(String(message));return false;};
+  try{ document.getElementById("presetDel").onclick(); }finally{ sandbox.confirm=realConfirm; }
+  assert.equal(asked.length,1);
+  assert.doesNotMatch(asked[0],/undefined/,"an unnamed entry must not be announced as undefined");
+  assert.match(asked[0],/#2/,"it falls back to the same positional label the dropdown shows");
+  assert.equal(app.Store.loadPresets().length,3,"declining changes nothing");
+  storage.clear();
+});
+
+test("export filenames stay portable at the truncation boundary and for unusable dates",()=>{
+  // Trimming separators before slicing left a trailing hyphen in the filename.
+  const long="a".repeat(39)+" tail";
+  const token=app.exportFileToken(long,"fallback");
+  assert.ok(token.length<=40);
+  assert.doesNotMatch(token,/-$/,"a truncated token must not end in a separator");
+  assert.doesNotMatch(token,/^-/);
+  const name=app.exportFilename("preset","json",long,Date.UTC(2026,7,29));
+  assert.doesNotMatch(name,/--/,"no doubled separator before the date stamp");
+  assert.match(name,/^[a-z0-9.-]+$/,"filenames stay portable");
+
+  // The date stamp must degrade to a marker rather than "NaN-NaN-NaN".
+  assert.equal(app.exportDateStamp(Date.UTC(2026,7,29)),"2026-08-29");
+  for(const bad of [NaN,"not a date",new Date("nope"),{}]){
+    assert.equal(app.exportDateStamp(bad),"undated",String(bad)+" must degrade to undated");
+  }
+  assert.match(app.exportFilename("transcript","md","",NaN),/^relay-transcript-undated-v/);
+});
+
+test("a newer download confirmation is never cleared by an older timer",()=>{
+  sandbox.__timers.length=0;
+  const status=document.getElementById("exportStatus");
+  app.showExportStatus("relay-transcript-2026-08-29-v2.4.0-draft.md");
+  assert.match(status.textContent,/relay-transcript-2026-08-29/);
+  assert.equal(status.classList.contains("hidden"),false);
+  const first=sandbox.__timers.filter(timer=>timer.delay===6000);
+  assert.equal(first.length,1,"a confirmation schedules exactly one clear");
+
+  app.showExportStatus("relay-session-2026-08-29-v2.4.0-draft.json");
+  assert.match(status.textContent,/relay-session-2026-08-29/);
+  first[0].callback();                                  // the stale timer must not fire
+  assert.match(status.textContent,/relay-session-2026-08-29/,"an older timer must not clear a newer confirmation");
+  assert.equal(status.classList.contains("hidden"),false);
+
+  const second=sandbox.__timers.filter(timer=>timer.delay===6000&&timer.id!==first[0].id);
+  assert.equal(second.length,1);
+  second[0].callback();
+  assert.equal(status.textContent,"","the current timer clears it");
+  assert.equal(status.classList.contains("hidden"),true);
+  app.showExportStatus("");
+  assert.equal(status.classList.contains("hidden"),true);
+  sandbox.__timers.length=0;
+});
+
+test("preset identity is computed one way, so a legacy stored name cannot collide",()=>{
+  // Releases up to v2.2.0 wrote preset names without stripping angle brackets, so
+  // an upgraded library can hold "Q<A". Collision checks used to compare a fully
+  // normalized new name against a merely trimmed stored one, which let "QA" in
+  // beside it: two entries identical under the app's own identity function, with
+  // identical inspection titles. Every check now uses presetNameKey.
+  assert.equal(app.presetNameKey("Q<A"),"qa");
+  assert.equal(app.presetNameKey("  QA  "),"qa");
+  assert.equal(app.presetNameKey("Q\nA"),"qa");
+  assert.equal(app.presetNameKey("q".repeat(70)),"q".repeat(60));
+
+  const legacy={v:3,name:"Q<A",roster:[
+    {name:"ChatGPT",color:"#10a37f",url:"https://chatgpt.com",role:"Drafter",roleSet:true},
+    {name:"Claude", color:"#d97757",url:"https://claude.ai", role:"Critic", roleSet:true}
+  ],recipe:"debate",customSteps:[],rounds:1,closing:false,format:"markdown",promptLocale:"en"};
+
+  // rename must refuse the collision in both directions
+  assert.throws(()=>app.renamePresetList([legacy,samplePreset({name:"Docs"})],1,"QA"),/preset name exists/);
+  assert.throws(()=>app.renamePresetList([samplePreset({name:"Other"}),samplePreset({name:"Docs"})],1,"Ot<her"),/preset name exists/);
+  // an unrelated rename still works
+  assert.equal(app.renamePresetList([legacy,samplePreset({name:"Docs"})],1,"Notes").preset.name,"Notes");
+
+  // Save must find the legacy row rather than appending a twin
+  storage.clear();
+  app.Store.savePresets([legacy]);
+  app.setPromptReply("QA");
+  app.setConfirmReply(true);
+  document.getElementById("presetSave").onclick();
+  const names=app.Store.loadPresets().map(p=>p.name);
+  assert.equal(names.length,1,"saving a name that normalizes onto a legacy row must overwrite, not duplicate");
+  assert.equal(new Set(names.map(app.presetNameKey)).size,names.length,"no two stored presets share an identity key");
+
+  // duplicate must not hand out a name that collides with the legacy row
+  storage.clear();
+  const dup=app.duplicatePresetList([legacy,samplePreset({name:"QA copy"})],0,"QA");
+  assert.equal(new Set(dup.presets.map(p=>app.presetNameKey(p.name))).size,dup.presets.length);
+  storage.clear();
 });
 
 test("standalone privacy boundary remains intact",()=>{
