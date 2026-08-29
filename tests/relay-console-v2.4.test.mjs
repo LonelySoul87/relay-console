@@ -84,7 +84,7 @@ globalThis.__relayTest={
   parseBallot,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
-  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
+  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
   recoveryRecord,recoverySize,recoveryExpired,recoveryExpiresAt,readRecovery,captureRecovery,captureBeforeDestructive,
   refreshRecoveryOffer,restoreRecovery,removeRecovery,renderRecoveryBar,renderStorageReport,renderSaveStatus,saveState,formatBytes,saveSetupDraft,scheduleStorageReport,storageBytes,RECOVERY_FUTURE_SKEW_MS,
@@ -92,7 +92,7 @@ globalThis.__relayTest={
   setResumeOffer(value){resumeOffer=value;},getResumeOffer(){return resumeOffer;},
   getRecoveryOffer(){return recoveryOffer;},
   getConsumeRecoveryToken(){return consumeRecoveryToken;},
-  showPresetStatus,miniCopy,download,
+  showPresetStatus,showExportStatus,exportDateStamp,exportFileToken,exportFilename,downloadRelayFile,miniCopy,download,
   resetStorageReportScheduler(){storageReportPending=false;},
   resetSaveStatus(){lastSaveOk=null;lastSaveAt=null;renderSaveStatus();},
   getSaveStatus(){return {ok:lastSaveOk,at:lastSaveAt};},
@@ -620,6 +620,161 @@ test("preset save and delete keep question and answers out of the preset",()=>{
   assert.match(document.getElementById("storageReport").children[0].textContent,new RegExp(`presets ${presetUsage}`));
 });
 
+test("preset rename and duplicate helpers preserve configuration without mutating the source",()=>{
+  const source=[
+    samplePreset({name:"Alpha",question:"PRIVATE QUESTION",answers:["PRIVATE ANSWER"]}),
+    samplePreset({name:"Alpha copy"})
+  ];
+  const before=JSON.stringify(source);
+  const renamed=plain(app.renamePresetList(source,0,"Renamed"));
+  assert.equal(JSON.stringify(source),before);
+  assert.deepEqual(renamed.presets.map(p=>p.name),["Renamed","Alpha copy"]);
+  assert.equal(renamed.preset.recipe,"dcr");
+  assert.equal("question" in renamed.preset,false);
+  assert.equal("answers" in renamed.preset,false);
+  assert.throws(()=>app.renamePresetList(source,0,"alpha COPY"),/preset name exists/);
+
+  const duplicated=plain(app.duplicatePresetList(source,0,"Alpha copy"));
+  assert.equal(JSON.stringify(source),before);
+  assert.deepEqual(duplicated.presets.map(p=>p.name),["Alpha","Alpha copy","Alpha copy (2)"]);
+  assert.equal(duplicated.preset.recipe,"dcr");
+  assert.equal("question" in duplicated.preset,false);
+  assert.equal("answers" in duplicated.preset,false);
+  assert.throws(()=>app.duplicatePresetList(Array.from({length:app.MAX_PRESETS},(_,i)=>samplePreset({name:`P${i}`})),0,"Copy"),/preset limit/);
+});
+
+test("preset management writes once per successful action and keeps selection on the result",()=>{
+  storage.clear();
+  app.Store.savePresets([samplePreset({name:"Original"})]);
+  app.renderPresets(0);
+  const originalSave=app.Store.savePresets;
+  let writes=0;
+  app.Store.savePresets=value=>{writes++;return originalSave.call(app.Store,value);};
+  try{
+    app.setPromptReply("Renamed");
+    document.getElementById("presetRename").onclick();
+    assert.equal(writes,1);
+    assert.deepEqual(app.Store.loadPresets().map(p=>p.name),["Renamed"]);
+    assert.equal(document.getElementById("presetSelect").value,"0");
+
+    document.getElementById("presetDuplicate").onclick();
+    assert.equal(writes,2);
+    assert.deepEqual(app.Store.loadPresets().map(p=>p.name),["Renamed","Renamed copy"]);
+    assert.equal(document.getElementById("presetSelect").value,"1");
+    assert.match(document.getElementById("presetStatus").textContent,/duplicated as Renamed copy/i);
+  }finally{app.Store.savePresets=originalSave;}
+
+  app.renderPresets(0);
+  app.setPromptReply("renamed copy");
+  sandbox.__alerts.length=0;
+  document.getElementById("presetRename").onclick();
+  assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.presetNameExists"));
+  assert.deepEqual(app.Store.loadPresets().map(p=>p.name),["Renamed","Renamed copy"]);
+
+  const failedSave=app.Store.savePresets;
+  app.Store.savePresets=()=>false;
+  try{
+    app.setConfirmReply(true);
+    document.getElementById("presetSelect").value="1";
+    sandbox.__alerts.length=0;
+    document.getElementById("presetDel").onclick();
+    assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.presetSaveFailed"));
+    assert.deepEqual(app.Store.loadPresets().map(p=>p.name),["Renamed","Renamed copy"]);
+  }finally{app.Store.savePresets=failedSave;}
+});
+
+test("selected preset inspection is localized and treats invalid storage as untrusted",()=>{
+  storage.clear();
+  app.Store.savePresets([samplePreset({name:"Inspect me",rounds:2,promptLocale:"fr"}),samplePreset({name:"Second",rounds:1,promptLocale:"es"})]);
+  app.renderPresets(0);
+  const summary=document.getElementById("presetSummary");
+  let text=descendants(summary).map(node=>node.textContent).join(" ");
+  assert.match(text,/Inspect me/);
+  assert.match(text,/2 participants/);
+  assert.match(text,/2 rounds/);
+  assert.match(text,/Français/);
+  assert.match(text,/ChatGPT: Drafter/);
+  assert.equal(document.getElementById("presetLoad").disabled,false);
+  assert.equal(document.getElementById("presetExportSelected").disabled,false);
+  document.getElementById("presetSelect").value="1";
+  app.renderPresetSummary();
+  app.setUiLocale("fr",false);
+  assert.equal(document.getElementById("presetSelect").value,"1");
+  text=descendants(summary).map(node=>node.textContent).join(" ");
+  assert.match(text,/Second/);
+  assert.match(text,/2 participants/);
+  assert.match(text,/1 manche/);
+  assert.match(text,/Markdown, sûr à copier/);
+  app.setUiLocale("en",false);
+
+  app.Store.savePresets([{name:"Broken",roster:[{name:"Only one"}]}]);
+  app.renderPresets(0);
+  assert.equal(summary.textContent,app.tr("en","presets.invalid"));
+  assert.equal(summary.classList.contains("hidden"),false);
+  assert.equal(document.getElementById("presetLoad").disabled,true);
+  assert.equal(document.getElementById("presetExportSelected").disabled,true);
+  assert.equal(document.getElementById("presetDel").disabled,false);
+});
+
+test("export filenames are dated, private, portable, and visibly confirmed",()=>{
+  const stamp=new Date(2026,7,29,23,45,0);
+  assert.equal(app.exportDateStamp(stamp),"2026-08-29");
+  assert.equal(app.exportFilename("preset","json","Décision: <Team>/A",stamp),"relay-preset-decision-team-a-2026-08-29-v2.4.0-draft.json");
+  assert.equal(app.exportFilename("transcript","md","",stamp),"relay-transcript-2026-08-29-v2.4.0-draft.md");
+  assert.doesNotMatch(app.exportFilename("session","json","PRIVATE QUESTION",stamp),/[<>:\\/?*]/);
+  const filename="relay-session-2026-08-29-v2.4.0-draft.json";
+  app.showExportStatus(filename);
+  const status=document.getElementById("exportStatus");
+  assert.equal(status.classList.contains("hidden"),false);
+  assert.equal(status.textContent,app.tr("en","export.requested",{filename}));
+});
+
+test("relay download controls use the filename helper and do not mutate the session",()=>{
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[{pid:"p0",name:"Alpha",color:"#10a37f",role:"Analyst",round:1,kind:"blind"}];
+  const s=stateFor(turns,ps,["CAPTURED ANSWER"]), before=JSON.stringify(s);
+  app.setState(s);
+  const originalCreate=document.createElement;
+  const requested=[];
+  document.createElement=tag=>{
+    const node=originalCreate(tag);
+    if(String(tag).toLowerCase()==="a")node.click=()=>requested.push(node.download);
+    return node;
+  };
+  try{
+    document.getElementById("exportMd2").onclick();
+    document.getElementById("saveSession").onclick();
+    document.getElementById("reviewPacketBtn").onclick();
+  }finally{document.createElement=originalCreate;}
+  assert.equal(JSON.stringify(s),before);
+  assert.match(requested[0],/^relay-transcript-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.md$/);
+  assert.match(requested[1],/^relay-session-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.json$/);
+  assert.match(requested[2],/^relay-review-packet-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.md$/);
+  assert.match(document.getElementById("exportStatus").textContent,new RegExp(requested[2].replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
+});
+
+test("selected preset export contains one validated preset and leaves the library untouched",async()=>{
+  storage.clear();
+  const library=[samplePreset({name:"Décision équipe"}),samplePreset({name:"Second"})];
+  app.Store.savePresets(library); app.renderPresets(0);
+  const before=JSON.stringify(app.Store.loadPresets());
+  const originalCreate=document.createElement, originalCreateUrl=sandbox.URL.createObjectURL;
+  let requested="", blob=null;
+  document.createElement=tag=>{
+    const node=originalCreate(tag);
+    if(String(tag).toLowerCase()==="a")node.click=()=>{requested=node.download;};
+    return node;
+  };
+  sandbox.URL.createObjectURL=value=>{blob=value;return originalCreateUrl(value);};
+  try{document.getElementById("presetExportSelected").onclick();}
+  finally{document.createElement=originalCreate;sandbox.URL.createObjectURL=originalCreateUrl;}
+  const bundle=JSON.parse(await blob.text());
+  assert.equal(JSON.stringify(app.Store.loadPresets()),before);
+  assert.deepEqual(bundle.presets.map(p=>p.name),["Décision équipe"]);
+  assert.match(requested,/^relay-preset-decision-equipe-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.json$/);
+  assert.match(document.getElementById("presetStatus").textContent,new RegExp(requested.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
+});
+
 test("portable preset export has a versioned privacy-safe envelope",()=>{
   const bundle=plain(app.exportPresetBundle([samplePreset({question:"DO NOT EXPORT",answers:["SECRET"],unknown:"drop"})]));
   assert.equal(bundle.kind,"relay-console-presets");
@@ -814,6 +969,11 @@ test("important visible controls have accessible labels",()=>{
   assert.match(html,/data-i18n-aria="turn\.promptAria"/);
   assert.match(html,/id="transcriptFilterStatus" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(html,/id="lane" role="navigation"[^>]*data-i18n-aria="lane\.navigation"/);
+  assert.match(html,/id="presetSummary" role="status" aria-live="polite" aria-atomic="true"/);
+  assert.match(html,/id="exportStatus" role="status" aria-live="polite" aria-atomic="true"/);
+  for(const id of ["presetRename","presetDuplicate","presetExportSelected","presetExport","presetDel"]){
+    assert.match(html,new RegExp(`id=["']${id}["'][^>]*data-i18n=`),id);
+  }
   assert.match(html,/st\.onkeydown=event=>\{ if\(\["Enter"," ","Spacebar"\]/);
   assert.match(html,/@media \(prefers-reduced-motion: reduce\)/);
   assert.match(html,/behavior:reduced\?"auto":"smooth"/);
