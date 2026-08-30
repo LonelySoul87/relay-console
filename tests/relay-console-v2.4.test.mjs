@@ -1973,6 +1973,42 @@ test("preset identity is computed one way, so a legacy stored name cannot collid
   storage.clear();
 });
 
+test("a bulk export status stays readable when many presets are skipped or left out",()=>{
+  // presetStatusNames caps each name list at three. Without it a library of a
+  // hundred entries puts every name into a one-line hint, which is where the
+  // status lives. Removing the cap leaves the rest of the suite green, so the
+  // behaviour needs its own assertion.
+  storage.clear();
+  const valid=Array.from({length:60},(_,i)=>samplePreset({name:"Keep"+String(i+1).padStart(2,"0")}));
+  const broken=Array.from({length:40},(_,i)=>({v:4,name:"Broken"+(i+1),roster:[{name:"only one"}],recipe:"debate",customSteps:[],rounds:1,closing:false,format:"markdown",promptLocale:"en"}));
+  app.Store.savePresets(valid.concat(broken));
+  app.renderPresets(0);
+  sandbox.__alerts.length=0;
+  document.getElementById("presetExport").onclick();
+
+  const status=document.getElementById("presetStatus").textContent;
+  assert.equal(sandbox.__alerts.length,0,"a library over the limit still exports");
+  assert.match(status,/Invalid presets skipped: 40/);
+  assert.match(status,/Extra stored presets left out: 10/);
+  // three names then an ellipsis, for each of the two lists
+  assert.equal((status.match(/, \.\.\./g)||[]).length,2,"both name lists are truncated");
+  assert.match(status,/Broken1, Broken2, Broken3, \.\.\./);
+  assert.match(status,/Keep51, Keep52, Keep53, \.\.\./);
+  assert.doesNotMatch(status,/Broken40/,"a long skipped list is not printed in full");
+  assert.doesNotMatch(status,/Keep60/,"a long overflow list is not printed in full");
+  assert.ok(status.length<340,"the status stays a one-line hint, saw "+status.length);
+
+  // three or fewer names are listed in full, with no ellipsis
+  storage.clear();
+  app.Store.savePresets(Array.from({length:52},(_,i)=>samplePreset({name:"P"+String(i+1).padStart(2,"0")})));
+  app.renderPresets(0);
+  document.getElementById("presetExport").onclick();
+  const short=document.getElementById("presetStatus").textContent;
+  assert.match(short,/Extra stored presets left out: 2\. Names: P51, P52\./);
+  assert.doesNotMatch(short,/\.\.\./);
+  storage.clear();
+});
+
 test("standalone privacy boundary remains intact",()=>{
   assert.match(html,/connect-src 'none'/);
   assert.doesNotMatch(html,/<script[^>]+src=/i);
