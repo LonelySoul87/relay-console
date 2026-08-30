@@ -2111,6 +2111,40 @@ test("activating a lane station keeps a keyboard user inside the lane",()=>{
   app.setState(null);storage.clear();
 });
 
+test("lane pointer and keyboard activations get useful focus destinations",()=>{
+  storage.clear();
+  const s=focusSession();
+  s.cursor=1;
+  app.setState(s);
+  app.renderTurn();
+  const stations=()=>document.getElementById("lane").children.filter(c=>c.tagName==="BUTTON");
+  const answersBefore=app.getState().answers.slice();
+
+  // A real pointer click has a positive detail count. It jumps straight to the
+  // answer field so the selected turn is ready to edit, including when the
+  // pointer clicks the already-current station.
+  stations()[1].focus();
+  assert.equal(stations()[1].onclick({detail:1}),true);
+  assert.equal(app.getState().cursor,1);
+  assert.equal(document.activeElement.id,"answer");
+
+  stations()[0].focus();
+  assert.equal(stations()[0].onclick({detail:1}),true);
+  assert.equal(app.getState().cursor,0);
+  assert.equal(document.activeElement.id,"answer");
+
+  // Keyboard activation keeps the station in focus so the user can continue
+  // exploring the lane without tabbing back to it after every selection.
+  let prevented=false;
+  stations()[1].focus();
+  assert.equal(stations()[1].onkeydown({key:"Enter",preventDefault(){prevented=true;}}),undefined);
+  assert.equal(prevented,true);
+  assert.equal(app.getState().cursor,1);
+  assert.ok(document.activeElement.closest("#lane"));
+  assert.deepEqual(app.getState().answers,answersBefore,"focus routing never changes captured answers");
+  app.setState(null);storage.clear();
+});
+
 test("the keyboard reference opens, is announced, and gives focus back",()=>{
   const dialog=document.getElementById("shortcuts");
   const trigger=document.getElementById("shortcutsBtn");
@@ -2134,10 +2168,15 @@ test("the keyboard reference opens, is announced, and gives focus back",()=>{
       assert.doesNotMatch(value,/\u2014/,locale+" "+key);
     }
   }
-  // every documented shortcut needs a modifier, so none of them fight typing
+  // The action shortcuts use modifiers. Escape is the standard close key and
+  // does not insert text, so the reference must describe that distinction.
   assert.match(html,/if\(e\.key==="Escape"\)/);
   assert.match(html,/\(e\.ctrlKey\|\|e\.metaKey\)&&e\.shiftKey/);
   assert.match(html,/\(e\.ctrlKey\|\|e\.metaKey\)&&e\.key==="Enter"/);
+  assert.match(app.I18N.en["shortcuts.note"],/^Saving, advancing, and copying use modifier keys\./);
+  assert.match(app.I18N.fr["shortcuts.note"],/^L’enregistrement, le passage au tour suivant et la copie utilisent des touches de modification\./);
+  assert.match(app.I18N.es["shortcuts.note"],/^Guardar, avanzar y copiar usan teclas modificadoras\./);
+  assert.doesNotMatch(app.I18N.en["shortcuts.note"],/Every shortcut uses a modifier/);
 });
 
 test("every pointer target meets the minimum size",()=>{

@@ -106,8 +106,9 @@ lost by accident**.
 - Finishing a relay, wrapping up early, and starting over no longer leave keyboard
   focus on a hidden control. Focus moves to the completion heading or back to the
   question, and an ordinary redraw never takes focus off a control you are using.
-- Activating a lane station keeps focus in the lane, so you can walk the relay from
-  the keyboard without being thrown back to the answer field on every step.
+- Activating a lane station from the keyboard keeps focus in the lane, so you can
+  keep exploring without being thrown back to the answer field on every step. A
+  pointer click moves directly to the answer for the selected turn.
 - A keyboard shortcut reference is available from the turn card.
 - The roster reorder arrows now meet the minimum pointer target size.
 
