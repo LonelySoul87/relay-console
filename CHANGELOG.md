@@ -42,6 +42,12 @@ lost by accident**.
 - Preset imports now re-check current storage immediately before applying. If
   another tab changed the saved presets, the review refreshes and no data is
   overwritten.
+- Export all now preserves a directly importable file containing the first 50
+  valid presets even if browser storage was hand-edited beyond the supported
+  ceiling. Valid extras are named in the status and remain available through
+  Export selected.
+- Preset export failures now clear any stale success line and use a dedicated,
+  localized explanation instead of referring to an invalid imported file.
 - Website addresses longer than the 300-character safety limit are removed
   instead of being silently shortened into a different working address.
 - Import review opens with focus on its heading so keyboard and screen-reader

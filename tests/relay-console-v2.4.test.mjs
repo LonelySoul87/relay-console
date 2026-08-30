@@ -101,7 +101,7 @@ globalThis.__relayTest={
   parseBallot,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
-  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
+  STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,presetStatusNames,presetExportStatus,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
   presetNameKey,selectedPresetIndex,exportFileToken,exportDateStamp,exportFilename,showExportStatus,
   recoveryRecord,recoverySize,recoveryExpired,recoveryExpiresAt,readRecovery,captureRecovery,captureBeforeDestructive,
@@ -812,8 +812,66 @@ test("preset export keeps valid entries and reports malformed stored entries",()
   const prepared=plain(app.preparePresetExport([samplePreset({name:"Good"}),malformed]));
   assert.deepEqual(prepared.bundle.presets.map(p=>p.name),["Good"]);
   assert.deepEqual(prepared.skipped,["Broken legacy"]);
+  assert.deepEqual(prepared.omitted,[]);
   assert.deepEqual(plain(app.exportPresetBundle([samplePreset({name:"Good"}),malformed])).presets.map(p=>p.name),["Good"]);
   assert.throws(()=>app.exportPresetBundle([malformed]));
+});
+
+test("bulk preset export preserves a valid 50-entry file and reports every extra",async()=>{
+  const valid=Array.from({length:51},(_,i)=>samplePreset({name:`P${i+1}`}));
+  const prepared=plain(app.preparePresetExport(valid));
+  assert.equal(prepared.bundle.presets.length,app.MAX_PRESETS);
+  assert.deepEqual(prepared.bundle.presets.map(p=>p.name),valid.slice(0,50).map(p=>p.name));
+  assert.deepEqual(prepared.skipped,[]);
+  assert.deepEqual(prepared.omitted,["P51"]);
+  assert.equal(app.validatePresetBundle(prepared.bundle).presets.length,50,"the partial backup remains directly importable");
+  assert.throws(()=>app.exportPresetBundle(valid),/preset export limit/,"the lower-level helper may not truncate silently");
+
+  const malformed={name:"Broken legacy",roster:[{name:"Only one"}],recipe:"debate"};
+  const mixed=plain(app.preparePresetExport([malformed,...valid]));
+  assert.deepEqual(mixed.skipped,["Broken legacy"]);
+  assert.deepEqual(mixed.omitted,["P51"]);
+  app.setUiLocale("en",false);
+  const status=app.presetExportStatus(mixed,"relay-presets.json");
+  assert.match(status,/Invalid presets skipped: 1/);
+  assert.match(status,/Extra stored presets left out: 1/);
+  assert.match(status,/P51/);
+  assert.match(status,/Export selected/);
+
+  storage.clear(); app.Store.savePresets(valid); app.renderPresets(0);
+  const before=JSON.stringify(app.Store.loadPresets()), originalCreate=document.createElement, originalCreateUrl=sandbox.URL.createObjectURL;
+  let requested="", blob=null;
+  document.createElement=tag=>{
+    const node=originalCreate(tag);
+    if(String(tag).toLowerCase()==="a")node.click=()=>{requested=node.download;};
+    return node;
+  };
+  sandbox.URL.createObjectURL=value=>{blob=value;return originalCreateUrl(value);};
+  try{document.getElementById("presetExport").onclick();}
+  finally{document.createElement=originalCreate;sandbox.URL.createObjectURL=originalCreateUrl;}
+  const downloaded=JSON.parse(await blob.text());
+  assert.match(requested,/^relay-presets-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.json$/);
+  assert.equal(downloaded.presets.length,50);
+  assert.deepEqual(downloaded.presets.map(p=>p.name),valid.slice(0,50).map(p=>p.name));
+  assert.match(document.getElementById("presetStatus").textContent,/P51/);
+  assert.equal(JSON.stringify(app.Store.loadPresets()),before,"bulk export changes no stored data");
+  storage.clear();
+});
+
+test("preset export failures clear stale success and use an export-specific explanation",()=>{
+  storage.clear();
+  const malformed={name:"Broken legacy",roster:[{name:"Only one"}],recipe:"debate"};
+  app.Store.savePresets([malformed]); app.renderPresets(0);
+  const before=JSON.stringify(app.Store.loadPresets()), status=document.getElementById("presetStatus");
+  for(const id of ["presetExport","presetExportSelected"]){
+    app.showPresetStatus("STALE SUCCESS"); sandbox.__alerts.length=0;
+    document.getElementById(id).onclick();
+    assert.equal(sandbox.__alerts.at(-1),app.tr("en","alert.presetExportFailed"),id);
+    assert.equal(status.textContent,"",id+" clears the stale status text");
+    assert.equal(status.classList.contains("hidden"),true,id+" hides the stale status region");
+    assert.equal(JSON.stringify(app.Store.loadPresets()),before,id+" changes no stored data");
+  }
+  storage.clear();
 });
 
 test("portable presets round trip through the strict bundle validator",()=>{
