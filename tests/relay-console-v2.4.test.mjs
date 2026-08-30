@@ -57,7 +57,17 @@ class FakeElement{
   dispatchEvent(event){const value=event||{};if(!value.target)value.target=this;(this.listeners[value.type]||[]).forEach(handler=>handler.call(this,value));return true;}
   querySelector(){return null;}
   querySelectorAll(){return [];}
-  focus(){this.focusCount++;}
+  matchesSelector(selector){
+    if(selector.startsWith("#"))return this.id===selector.slice(1);
+    if(selector.startsWith("."))return this.classList.contains(selector.slice(1));
+    return this.tagName===selector.toUpperCase();
+  }
+  closest(selector){
+    let node=this;
+    while(node){ if(node.matchesSelector&&node.matchesSelector(selector))return node; node=node.parentNode; }
+    return null;
+  }
+  focus(){this.focusCount++;document.activeElement=this;}
   select(){}
   click(){if(typeof this.onclick==="function")this.onclick({target:this});}
   scrollTo(){}
@@ -70,6 +80,7 @@ const documentElement=new FakeElement("html","html");
 const SELECT_IDS=new Set(["presetSelect","uiLocale","promptLocale","recipeSel","format","synthPick",
   "transcriptFilterParticipant","transcriptFilterKind","transcriptFilterRound","transcriptFilterState"]);
 const document={
+  activeElement:null,
   documentElement,
   body:new FakeElement("body","body"),
   getElementById(id){if(!elements.has(id))elements.set(id,new FakeElement(SELECT_IDS.has(id)?"select":"div",id));return elements.get(id);},
@@ -103,7 +114,7 @@ globalThis.__relayTest={
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,presetStatusNames,presetExportStatus,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
-  presetNameKey,selectedPresetIndex,exportFileToken,exportDateStamp,exportFilename,showExportStatus,
+  openShortcuts,closeShortcuts,navigateLaneToTurn,presetNameKey,selectedPresetIndex,exportFileToken,exportDateStamp,exportFilename,showExportStatus,
   recoveryRecord,recoverySize,recoveryExpired,recoveryExpiresAt,readRecovery,captureRecovery,captureBeforeDestructive,
   refreshRecoveryOffer,restoreRecovery,removeRecovery,renderRecoveryBar,renderStorageReport,renderSaveStatus,saveState,formatBytes,saveSetupDraft,scheduleStorageReport,storageBytes,RECOVERY_FUTURE_SKEW_MS,
   RECOVERY_VERSION,RECOVERY_MAX_BYTES,RECOVERY_MAX_AGE_MS,STORAGE_SOFT_LIMIT,
@@ -2007,6 +2018,137 @@ test("a bulk export status stays readable when many presets are skipped or left 
   assert.match(short,/Extra stored presets left out: 2\. Names: P51, P52\./);
   assert.doesNotMatch(short,/\.\.\./);
   storage.clear();
+});
+
+/* ---------- focus and keyboard access (v2.4) ---------- */
+function wireFocusContainment(){
+  // The harness creates elements flat, so mirror the containment the markup has:
+  // the answer field lives inside the turn card, which lives inside the run panel.
+  document.getElementById("turnCard").appendChild(document.getElementById("answer"));
+  document.getElementById("run").appendChild(document.getElementById("turnCard"));
+  document.getElementById("doneCard").appendChild(document.getElementById("copyFinal"));
+  document.getElementById("run").appendChild(document.getElementById("doneCard"));
+  document.getElementById("run").classList.remove("hidden");   // the relay panel is on screen
+}
+function focusSession(){
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"}
+  ];
+  wireFocusContainment();
+  const s=stateFor(turns,ps,["first answer","second answer"]);
+  s.question="Focus";s.cursor=0;s.ended=false;
+  return s;
+}
+function stranded(){
+  const active=document.activeElement;
+  return !active||!!(active.closest&&active.closest(".hidden"));
+}
+
+test("finishing a relay never leaves focus on a hidden control",()=>{
+  storage.clear();
+  const s=focusSession();
+  app.setState(s);
+  app.renderTurn();
+  assert.equal(document.activeElement.id,"answer","an open turn focuses the answer field");
+  assert.equal(stranded(),false);
+
+  // completing hides the turn card, so focus must move off it
+  s.cursor=s.turns.length;
+  app.renderTurn();
+  assert.equal(document.getElementById("turnCard").classList.contains("hidden"),true);
+  assert.equal(stranded(),false,"focus must not stay inside the hidden turn card");
+  assert.equal(document.activeElement.id,"doneHeading");
+
+  // wrapping up early hides it the same way
+  s.cursor=0;s.ended=false;app.renderTurn();
+  assert.equal(document.activeElement.id,"answer");
+  s.ended=true;app.renderTurn();
+  assert.equal(stranded(),false,"ending early must not strand focus either");
+  assert.equal(document.activeElement.id,"doneHeading");
+
+  // an ordinary re-render while already done must not steal focus from a control
+  document.getElementById("copyFinal").focus();
+  app.renderTurn();
+  assert.equal(document.activeElement.id,"copyFinal","a re-render leaves a usable focus alone");
+  app.setState(null);storage.clear();
+});
+
+test("starting over moves focus to the question instead of the hidden relay",()=>{
+  storage.clear();
+  const s=focusSession();
+  app.setState(s);
+  app.renderTurn();
+  assert.equal(document.activeElement.id,"answer");
+  app.setConfirmReply(true);
+  assert.equal(document.getElementById("restart").onclick(),true);
+  assert.equal(document.getElementById("run").classList.contains("hidden"),true);
+  assert.equal(stranded(),false,"focus must not stay inside the hidden run panel");
+  assert.equal(document.activeElement.id,"question");
+  storage.clear();
+});
+
+test("activating a lane station keeps a keyboard user inside the lane",()=>{
+  storage.clear();
+  const s=focusSession();
+  s.cursor=1;
+  app.setState(s);
+  app.renderTurn();
+  const stations=()=>document.getElementById("lane").children.filter(c=>c.tagName==="BUTTON");
+  assert.ok(stations().length>=2);
+
+  // from the lane: stay in the lane, on the station just activated
+  stations()[0].focus();
+  assert.equal(app.navigateLaneToTurn(0),true);
+  assert.equal(app.getState().cursor,0);
+  assert.ok(document.activeElement.closest("#lane"),"focus stays in the lane for keyboard navigation");
+
+  // from outside the lane: the answer field is the right destination
+  document.getElementById("answer").focus();
+  assert.equal(app.navigateLaneToTurn(1),true);
+  assert.equal(document.activeElement.id,"answer");
+  app.setState(null);storage.clear();
+});
+
+test("the keyboard reference opens, is announced, and gives focus back",()=>{
+  const dialog=document.getElementById("shortcuts");
+  const trigger=document.getElementById("shortcutsBtn");
+  trigger.focus();
+  assert.equal(app.openShortcuts(),true);
+  assert.equal(dialog.open,true);
+  assert.equal(document.activeElement.id,"shortcutsHeading","the dialog announces itself before its controls");
+  assert.equal(app.closeShortcuts(),true);
+  assert.equal(dialog.open,false);
+  assert.equal(document.activeElement.id,"shortcutsBtn","focus returns to the control that opened it");
+
+  // the reference is labelled, marked as a dialog trigger, and translated
+  assert.match(html,/<dialog id="shortcuts" class="shortcuts" aria-labelledby="shortcutsHeading">/);
+  assert.match(html,/id="shortcutsHeading" tabindex="-1"/);
+  assert.match(html,/id="shortcutsBtn"[^>]*aria-haspopup="dialog"/);
+  for(const locale of app.SUPPORTED_LOCALES){
+    for(const key of ["shortcuts.open","shortcuts.openAria","shortcuts.heading","shortcuts.close","shortcuts.saveAdvance","shortcuts.copyPrompt","shortcuts.closeMenu","shortcuts.note"]){
+      const value=app.I18N[locale][key];
+      assert.equal(typeof value,"string",locale+" "+key);
+      assert.ok(value.trim().length>0,locale+" "+key);
+      assert.doesNotMatch(value,/\u2014/,locale+" "+key);
+    }
+  }
+  // every documented shortcut needs a modifier, so none of them fight typing
+  assert.match(html,/if\(e\.key==="Escape"\)/);
+  assert.match(html,/\(e\.ctrlKey\|\|e\.metaKey\)&&e\.shiftKey/);
+  assert.match(html,/\(e\.ctrlKey\|\|e\.metaKey\)&&e\.key==="Enter"/);
+});
+
+test("every pointer target meets the minimum size",()=>{
+  // The roster reorder arrows were 19.6 by 18.6 CSS pixels and sit directly above
+  // one another, so the spacing exception did not apply.
+  const rule=html.match(/\.pcard \.ord button\{([^}]*)\}/);
+  assert.ok(rule,"the reorder arrows must have their own rule");
+  assert.match(rule[1],/min-width:24px/);
+  assert.match(rule[1],/min-height:24px/);
+  // the closing checkbox is small but its label is the target, so it is exempt
+  assert.match(html,/<label class="check" id="closingWrap"><input type="checkbox" id="closing">/);
 });
 
 test("standalone privacy boundary remains intact",()=>{

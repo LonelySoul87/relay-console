@@ -103,6 +103,14 @@ lost by accident**.
 - Download filenames stay portable when a long name is truncated, and an unusable
   date degrades to a marker rather than a broken stamp.
 
+- Finishing a relay, wrapping up early, and starting over no longer leave keyboard
+  focus on a hidden control. Focus moves to the completion heading or back to the
+  question, and an ordinary redraw never takes focus off a control you are using.
+- Activating a lane station keeps focus in the lane, so you can walk the relay from
+  the keyboard without being thrown back to the answer field on every step.
+- A keyboard shortcut reference is available from the turn card.
+- The roster reorder arrows now meet the minimum pointer target size.
+
 ### Privacy
 
 - Discarded or replaced work can now remain in local browser storage for up to

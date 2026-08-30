@@ -148,6 +148,15 @@
 
   .resume{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--signal);box-shadow:0 0 0 3px var(--focus-ring);border-radius:12px;padding:13px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
   .resume .msg{font-size:13.5px;line-height:1.6;flex:1 1 240px;min-width:0;overflow-wrap:anywhere}
+  dialog.shortcuts{width:min(420px,calc(100vw - 28px));max-height:calc(100vh - 36px);overflow:auto;background:linear-gradient(180deg,var(--panel),var(--panel-2));color:var(--text);border:1px solid var(--signal);border-radius:var(--r);padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.45)}
+  dialog.shortcuts::backdrop{background:rgba(0,0,0,.45)}
+  dialog.shortcuts h2{margin:0 0 4px;font-size:16px}
+  dialog.shortcuts dl{margin:14px 0 0;display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:baseline}
+  dialog.shortcuts dt{margin:0}
+  dialog.shortcuts dd{margin:0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+  dialog.shortcuts kbd{font-family:var(--mono);font-size:11.5px;background:var(--bg-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:3px 6px;white-space:nowrap;color:var(--text)}
+  dialog.shortcuts .note{font-size:12px;color:var(--muted);margin:14px 0 0;line-height:1.55}
+  @media (max-width:430px){dialog.shortcuts{padding:15px}dialog.shortcuts dl{grid-template-columns:1fr;gap:3px 0}dialog.shortcuts dd{margin-bottom:7px}}
   dialog.importpreview{width:min(680px,calc(100vw - 28px));max-height:calc(100vh - 36px);overflow:auto;background:linear-gradient(180deg,var(--panel),var(--panel-2));color:var(--text);border:1px solid var(--signal);border-radius:var(--r);padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.45)}
   dialog.importpreview::backdrop{background:rgba(10,9,14,.68);backdrop-filter:blur(2px)}
   .importintro{margin:0 0 14px;color:var(--entry-text)}
@@ -180,7 +189,7 @@
   .pcard input.pname:focus{box-shadow:none}
   .pcard .swatch{width:24px;height:24px;border-radius:7px;border:1px solid var(--line);padding:0;cursor:pointer;flex:none;background:none}
   .pcard .ord{display:flex;flex-direction:column;gap:2px;flex:none}
-  .pcard .ord button{font-family:var(--mono);font-size:11px;line-height:1;padding:3px 6px;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px}
+  .pcard .ord button{font-family:var(--mono);font-size:11px;line-height:1;min-width:24px;min-height:24px;padding:3px 6px;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;display:flex;align-items:center;justify-content:center}
   .pcard .ord button:hover:not(:disabled){color:var(--accent-text);border-color:var(--signal)}
   .pcard .ord button:disabled{opacity:.3;cursor:not-allowed}
   .pcard .fields{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -397,6 +406,19 @@
 
   <div id="storageWarn" class="storagewarn hidden" data-i18n-html="storage.warning">Autosave isn't working: your browser's local storage may be full, disabled, or unavailable. Use <b>Save file</b> in the transcript panel to download your session so you don't lose it.</div>
 
+  <dialog id="shortcuts" class="shortcuts" aria-labelledby="shortcutsHeading">
+    <h2 id="shortcutsHeading" tabindex="-1" data-i18n="shortcuts.heading">Keyboard shortcuts</h2>
+    <dl>
+      <dt><kbd>Ctrl</kbd> + <kbd>Enter</kbd></dt><dd data-i18n="shortcuts.saveAdvance">Save the pasted answer and advance to the next turn.</dd>
+      <dt><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd></dt><dd data-i18n="shortcuts.copyPrompt">Copy the current prompt without leaving the keyboard.</dd>
+      <dt><kbd>Esc</kbd></dt><dd data-i18n="shortcuts.closeMenu">Close the add-chatbot menu, or this window.</dd>
+    </dl>
+    <p class="note" data-i18n="shortcuts.note">Every shortcut uses a modifier, so none of them interfere with typing in the question, prompt, or answer fields. On a Mac, use Command instead of Ctrl.</p>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button class="ghost" id="shortcutsClose" data-i18n="shortcuts.close">Close</button>
+    </div>
+  </dialog>
+
   <dialog id="importPreview" class="importpreview" aria-labelledby="importPreviewHeading" aria-describedby="importPreviewIntro">
     <div class="spread" style="margin-bottom:12px">
       <h2 id="importPreviewHeading" tabindex="-1" style="margin:0" data-i18n="importPreview.heading">Review import</h2>
@@ -538,6 +560,7 @@
         <span class="who" id="turnWho"></span>
         <span class="roundtag" id="turnRound"></span>
         <button class="tiny" id="helpBtn" title="Show the steps" aria-label="Show relay tips" data-i18n="turn.tips" data-i18n-title="turn.tipsTitle" data-i18n-aria="turn.tipsAria">tips</button>
+        <button class="tiny" id="shortcutsBtn" aria-label="Show keyboard shortcuts" data-i18n="shortcuts.open" data-i18n-aria="shortcuts.openAria" aria-haspopup="dialog">keys</button>
       </div>
       <p class="roleline hidden" id="roleLine"></p>
       <p class="stalewarn hidden" id="staleWarn" role="status" aria-live="polite"></p>
@@ -588,7 +611,7 @@
     </div>
 
     <div class="card hidden" id="doneCard">
-      <h2 data-i18n="done.heading">Relay complete</h2>
+      <h2 id="doneHeading" tabindex="-1" data-i18n="done.heading">Relay complete</h2>
       <p class="hint" id="doneMsg" style="margin-bottom:12px"></p>
       <div class="stats hidden" id="doneStats"></div>
       <div class="row">
@@ -717,6 +740,7 @@ const EN={
   "format.block.name":"Verbatim code block (best for tables: copy with the block's copy button)","format.block.hint":"Models wrap the whole reply in one four-backtick code block (so code samples inside survive). In the chat UI that block gets a copy button that hands you the raw text verbatim, tables and all, which is the reliable way to move structure through the relay.","format.block.directive":"Put your entire reply inside a single fenced code block opened and closed by four backticks (a line with exactly ```` then your full answer in Markdown, then a closing line with exactly ````). Code samples inside your answer can use ordinary triple-backtick fences without breaking the outer one. This lets me copy your whole reply verbatim with the code block's copy button. Keep any tables as Markdown pipe tables inside the block.",
   "presets.heading":"Presets","presets.saved":"Saved preset","presets.none":"No saved presets","presets.load":"Load","presets.save":"Save current","presets.manage":"Manage selected preset","presets.rename":"Rename","presets.duplicate":"Duplicate","presets.copyName":"{name} copy","presets.delete":"Delete","presets.exportSelected":"Export selected","presets.exportAll":"Export all","presets.import":"Import","presets.savedStatus":"Preset saved: {name}.","presets.loaded":"Preset loaded: {name}.","presets.deleted":"Preset deleted: {name}.","presets.exported":"Preset file requested: {filename} ({count}).","presets.exportedWithSkipped":"Preset file requested: {filename} ({count}). Invalid presets skipped: {skipped}. Names: {names}.","presets.exportedWithLimit":"Preset file requested: {filename} ({count}). Extra stored presets left out: {omitted}. Names: {names}. Export them individually with Export selected.","presets.exportedWithSkippedAndLimit":"Preset file requested: {filename} ({count}). Invalid presets skipped: {skipped}. Names: {skippedNames}. Extra stored presets left out: {omitted}. Names: {omittedNames}. Export the extras individually with Export selected.","presets.renamed":"Preset renamed to {name}.","presets.duplicated":"Preset duplicated as {name}.","presets.imported":"Presets imported: {count}.","presets.participant.one":"1 participant","presets.participant.other":"{count} participants","presets.round.one":"1 round","presets.round.other":"{count} rounds","presets.currentPromptLanguage":"current prompt language","presets.summary":"{participants} · {plan} · {rounds} · {format} · prompts: {language}","presets.people":"People: {names}","presets.invalid":"This stored preset is invalid and cannot be inspected or exported.","presets.hint":"A preset stores your roster, recipe, custom steps, rounds, and format under a name. It never stores your question or any answers. Saved locally in this browser only, unless you export a portable preset file.",
   "actions.start":"Start relay","actions.import":"Open a saved file",
+  "shortcuts.open":"keys","shortcuts.openAria":"Show keyboard shortcuts","shortcuts.heading":"Keyboard shortcuts","shortcuts.close":"Close","shortcuts.saveAdvance":"Save the pasted answer and advance to the next turn.","shortcuts.copyPrompt":"Copy the current prompt without leaving the keyboard.","shortcuts.closeMenu":"Close the add-chatbot menu, or this window.","shortcuts.note":"Every shortcut uses a modifier, so none of them interfere with typing in the question, prompt, or answer fields. On a Mac, use Command instead of Ctrl.",
   "turn.tips":"tips","turn.tipsTitle":"Show the steps","turn.tipsAria":"Show relay tips","turn.promptFor":"Prompt for","turn.chatbot":"the chatbot","turn.editable":"(editable)","turn.edited":"edited","turn.regenerate":"Regenerate","turn.regeneratePrompt":"Regenerate prompt","turn.keepPrompt":"Keep edited prompt","turn.promptAria":"Prompt for the current chatbot","turn.copyOpen":"Copy & open","turn.copyOpenName":"Copy & open {name}","turn.copyPrompt":"Copy prompt","turn.copyOnly":"Copy only","turn.pasteAnswer":"Paste its answer back here","turn.tidy":"Tidy spacing","turn.answerPlaceholder":"Paste the reply, then save & advance (Ctrl+Enter)","turn.saveNext":"Save & advance","turn.back":"Back","turn.skip":"Skip","turn.endEarly":"Wrap up now","turn.roleLine":"Role woven into this prompt: {role}","turn.stale":"⚠ This saved answer may be outdated because an earlier turn changed. Re-paste this answer to refresh it against the new context.","turn.promptStale":"⚠ This edited prompt may contain stale context because an earlier answer or forwarded context changed.","turn.review":"⚠ You trimmed what this turn sends forward, then the original changed. The trimmed version is still being sent. Open “Edit what's sent forward” in the transcript to reconfirm.","turn.synthRunner":"{name} (your synthesis runner)","turn.synthAny":"whichever model you trust to merge it","turn.position":"{kind} · turn {current}/{total}",
   "turn.kind.debate":"round {round}{ofRounds}","turn.ofRounds":" of {rounds}","turn.kind.blind":"independent answer","turn.kind.revise":"revision of their earlier answer","turn.kind.ballot":"peer ranking","turn.kind.synth":"final synthesis",
   "ballot.parsed":"Parsed ranking","ballot.note":"Parsed from the pasted reply. Check it. Adjust with the dropdowns if the parse got it wrong; nothing is inferred silently.","ballot.confirmedManual":"Confirmed ranking (adjusted manually)","ballot.bestFirst":"Parsed ranking (best first)","ballot.none":"No ranking parsed yet. Paste a reply containing e.g. RANKING: B > A > C","ballot.rankPosition":"Rank position {number}","ballot.confirmOrder":"Confirm shown order","ballot.reparse":"Reparse reply",
@@ -778,6 +802,7 @@ const FR={
   "format.block.name":"Bloc de code fidèle (idéal pour les tableaux : utiliser le bouton de copie du bloc)","format.block.hint":"Les modèles placent toute leur réponse dans un bloc délimité par quatre accents graves, ce qui préserve les exemples de code internes. Dans le chat, le bouton du bloc copie fidèlement le texte brut, tableaux compris.","format.block.directive":"Place toute ta réponse dans un unique bloc de code ouvert et fermé par quatre accents graves (une ligne contenant exactement ```` puis la réponse Markdown complète, puis une ligne de fermeture contenant exactement ````). Les exemples de code internes peuvent utiliser les blocs ordinaires à trois accents graves sans fermer le bloc externe. Je pourrai ainsi copier fidèlement toute ta réponse avec le bouton de copie du bloc. Conserve les tableaux au format Markdown avec barres verticales dans ce bloc.",
   "presets.heading":"Préréglages","presets.saved":"Préréglage enregistré","presets.none":"Aucun préréglage enregistré","presets.load":"Charger","presets.save":"Enregistrer l’actuel","presets.manage":"Gérer le préréglage sélectionné","presets.rename":"Renommer","presets.duplicate":"Dupliquer","presets.copyName":"Copie de {name}","presets.delete":"Supprimer","presets.exportSelected":"Exporter la sélection","presets.exportAll":"Tout exporter","presets.import":"Importer","presets.savedStatus":"Préréglage enregistré : {name}.","presets.loaded":"Préréglage chargé : {name}.","presets.deleted":"Préréglage supprimé : {name}.","presets.exported":"Fichier de préréglages demandé : {filename} ({count}).","presets.exportedWithSkipped":"Fichier de préréglages demandé : {filename} ({count}). Préréglages invalides ignorés : {skipped}. Noms : {names}.","presets.exportedWithLimit":"Fichier de préréglages demandé : {filename} ({count}). Préréglages enregistrés supplémentaires non inclus : {omitted}. Noms : {names}. Exportez-les individuellement avec Exporter la sélection.","presets.exportedWithSkippedAndLimit":"Fichier de préréglages demandé : {filename} ({count}). Préréglages invalides ignorés : {skipped}. Noms : {skippedNames}. Préréglages enregistrés supplémentaires non inclus : {omitted}. Noms : {omittedNames}. Exportez ces derniers individuellement avec Exporter la sélection.","presets.renamed":"Préréglage renommé en {name}.","presets.duplicated":"Préréglage dupliqué sous le nom {name}.","presets.imported":"Préréglages importés : {count}.","presets.participant.one":"1 participant","presets.participant.other":"{count} participants","presets.round.one":"1 manche","presets.round.other":"{count} manches","presets.currentPromptLanguage":"langue actuelle des instructions","presets.summary":"{participants} · {plan} · {rounds} · {format} · instructions : {language}","presets.people":"Participants : {names}","presets.invalid":"Ce préréglage enregistré est invalide et ne peut pas être inspecté ni exporté.","presets.hint":"Un préréglage conserve sous un nom la liste, la recette, les étapes personnalisées, les manches et le format. Il ne conserve jamais votre question ni les réponses. Il reste dans ce navigateur, sauf si vous exportez un fichier de préréglages portable.",
   "actions.start":"Démarrer le relais","actions.import":"Ouvrir un fichier enregistré",
+  "shortcuts.open":"touches","shortcuts.openAria":"Afficher les raccourcis clavier","shortcuts.heading":"Raccourcis clavier","shortcuts.close":"Fermer","shortcuts.saveAdvance":"Enregistrer la réponse collée et passer au tour suivant.","shortcuts.copyPrompt":"Copier l’invite actuelle sans quitter le clavier.","shortcuts.closeMenu":"Fermer le menu d’ajout de chatbot, ou cette fenêtre.","shortcuts.note":"Chaque raccourci utilise une touche de modification ; aucun ne gêne donc la saisie dans les champs de question, d’invite ou de réponse. Sur Mac, utilisez Commande au lieu de Ctrl.",
   "turn.tips":"aide","turn.tipsTitle":"Afficher les étapes","turn.tipsAria":"Afficher l’aide du relais","turn.promptFor":"Invite pour","turn.chatbot":"le chatbot","turn.editable":"(modifiable)","turn.edited":"modifiée","turn.regenerate":"Régénérer","turn.regeneratePrompt":"Régénérer l’invite","turn.keepPrompt":"Conserver l’invite modifiée","turn.promptAria":"Invite du chatbot actuel","turn.copyOpen":"Copier et ouvrir","turn.copyOpenName":"Copier et ouvrir {name}","turn.copyPrompt":"Copier l’invite","turn.copyOnly":"Copier seulement","turn.pasteAnswer":"Collez sa réponse ici","turn.tidy":"Nettoyer les espacements","turn.answerPlaceholder":"Collez la réponse, puis enregistrez et avancez (Ctrl+Entrée)","turn.saveNext":"Enregistrer et avancer","turn.back":"Retour","turn.skip":"Passer","turn.endEarly":"Terminer maintenant","turn.roleLine":"Rôle intégré à cette invite : {role}","turn.stale":"⚠ Cette réponse enregistrée est peut-être obsolète, car un tour antérieur a changé. Collez de nouveau la réponse pour l’actualiser avec le nouveau contexte.","turn.promptStale":"⚠ Cette invite modifiée contient peut-être un contexte obsolète, car une réponse antérieure ou le contexte transmis a changé.","turn.review":"⚠ Vous avez réduit le contenu transmis par ce tour, puis l’original a changé. La version réduite est toujours transmise. Ouvrez « Modifier ce qui est transmis » dans la transcription pour la confirmer.","turn.synthRunner":"{name} (responsable de la synthèse)","turn.synthAny":"le modèle auquel vous faites confiance pour tout fusionner","turn.position":"{kind} · tour {current}/{total}",
   "turn.kind.debate":"manche {round}{ofRounds}","turn.ofRounds":" sur {rounds}","turn.kind.blind":"réponse indépendante","turn.kind.revise":"révision de sa réponse précédente","turn.kind.ballot":"classement croisé","turn.kind.synth":"synthèse finale",
   "ballot.parsed":"Classement détecté","ballot.note":"Détecté dans la réponse collée. Vérifiez-le. Corrigez-le avec les listes si nécessaire ; rien n’est déduit silencieusement.","ballot.confirmedManual":"Classement confirmé (corrigé manuellement)","ballot.bestFirst":"Classement détecté (meilleur en premier)","ballot.none":"Aucun classement détecté. Collez une réponse contenant par exemple CLASSEMENT : B > A > C","ballot.rankPosition":"Position {number} du classement","ballot.confirmOrder":"Confirmer l’ordre affiché","ballot.reparse":"Analyser de nouveau la réponse",
@@ -839,6 +864,7 @@ const ES={
   "format.block.name":"Bloque de código literal (ideal para tablas: usa el botón de copia del bloque)","format.block.hint":"Los modelos envuelven toda la respuesta en un bloque de código de cuatro comillas invertidas, de modo que los ejemplos de código internos se conserven. En la interfaz del chat, el botón de copia del bloque entrega el texto literal con sus tablas y estructura.","format.block.directive":"Pon toda tu respuesta dentro de un único bloque de código que empiece y termine con cuatro comillas invertidas: una línea con exactamente ```` seguida de toda la respuesta en Markdown y una línea final con exactamente ````. Los ejemplos de código internos pueden usar bloques normales de tres comillas invertidas. Así podré copiar la respuesta completa de forma literal. Conserva las tablas como tablas Markdown dentro del bloque.",
   "presets.heading":"Preajustes","presets.saved":"Preajuste guardado","presets.none":"No hay preajustes guardados","presets.load":"Cargar","presets.save":"Guardar actual","presets.manage":"Gestionar el preajuste seleccionado","presets.rename":"Cambiar nombre","presets.duplicate":"Duplicar","presets.copyName":"Copia de {name}","presets.delete":"Eliminar","presets.exportSelected":"Exportar seleccionado","presets.exportAll":"Exportar todos","presets.import":"Importar","presets.savedStatus":"Preajuste guardado: {name}.","presets.loaded":"Preajuste cargado: {name}.","presets.deleted":"Preajuste eliminado: {name}.","presets.exported":"Archivo de preajustes solicitado: {filename} ({count}).","presets.exportedWithSkipped":"Archivo de preajustes solicitado: {filename} ({count}). Preajustes no válidos omitidos: {skipped}. Nombres: {names}.","presets.exportedWithLimit":"Archivo de preajustes solicitado: {filename} ({count}). Preajustes guardados adicionales no incluidos: {omitted}. Nombres: {names}. Expórtalos individualmente con Exportar seleccionado.","presets.exportedWithSkippedAndLimit":"Archivo de preajustes solicitado: {filename} ({count}). Preajustes no válidos omitidos: {skipped}. Nombres: {skippedNames}. Preajustes guardados adicionales no incluidos: {omitted}. Nombres: {omittedNames}. Exporta estos últimos individualmente con Exportar seleccionado.","presets.renamed":"Preajuste renombrado como {name}.","presets.duplicated":"Preajuste duplicado como {name}.","presets.imported":"Preajustes importados: {count}.","presets.participant.one":"1 participante","presets.participant.other":"{count} participantes","presets.round.one":"1 ronda","presets.round.other":"{count} rondas","presets.currentPromptLanguage":"idioma actual de las instrucciones","presets.summary":"{participants} · {plan} · {rounds} · {format} · instrucciones: {language}","presets.people":"Participantes: {names}","presets.invalid":"Este preajuste guardado no es válido y no se puede inspeccionar ni exportar.","presets.hint":"Un preajuste guarda con un nombre la lista, la receta, los pasos personalizados, las rondas y el formato. Nunca guarda la pregunta ni las respuestas. Se conserva en este navegador, salvo que exportes un archivo portátil de preajustes.",
   "actions.start":"Iniciar relevo","actions.import":"Abrir un archivo guardado",
+  "shortcuts.open":"teclas","shortcuts.openAria":"Mostrar atajos de teclado","shortcuts.heading":"Atajos de teclado","shortcuts.close":"Cerrar","shortcuts.saveAdvance":"Guardar la respuesta pegada y avanzar al siguiente turno.","shortcuts.copyPrompt":"Copiar la instrucción actual sin soltar el teclado.","shortcuts.closeMenu":"Cerrar el menú para añadir chatbots, o esta ventana.","shortcuts.note":"Todos los atajos usan una tecla modificadora, así que ninguno interfiere al escribir en los campos de pregunta, instrucción o respuesta. En Mac, usa Comando en lugar de Ctrl.",
   "turn.tips":"ayuda","turn.tipsTitle":"Mostrar los pasos","turn.tipsAria":"Mostrar ayuda del relevo","turn.promptFor":"Instrucción para","turn.chatbot":"el chatbot","turn.editable":"(editable)","turn.edited":"editada","turn.regenerate":"Regenerar","turn.regeneratePrompt":"Regenerar instrucción","turn.keepPrompt":"Conservar instrucción editada","turn.promptAria":"Instrucción para el chatbot actual","turn.copyOpen":"Copiar y abrir","turn.copyOpenName":"Copiar y abrir {name}","turn.copyPrompt":"Copiar instrucción","turn.copyOnly":"Solo copiar","turn.pasteAnswer":"Pega aquí su respuesta","turn.tidy":"Ordenar espacios","turn.answerPlaceholder":"Pega la respuesta y después guarda y avanza (Ctrl+Intro)","turn.saveNext":"Guardar y avanzar","turn.back":"Atrás","turn.skip":"Omitir","turn.endEarly":"Terminar ahora","turn.roleLine":"Rol integrado en esta instrucción: {role}","turn.stale":"⚠ Esta respuesta guardada puede estar desactualizada porque cambió un turno anterior. Vuelve a pegarla para actualizarla con el nuevo contexto.","turn.promptStale":"⚠ Esta instrucción editada puede contener contexto desactualizado porque cambió una respuesta anterior o el contexto transmitido.","turn.review":"⚠ Recortaste lo que este turno transmite y después cambió el original. La versión recortada sigue enviándose. Abre “Editar lo que se transmite” en la transcripción para confirmarla de nuevo.","turn.synthRunner":"{name} (responsable de la síntesis)","turn.synthAny":"el modelo en el que confíes para combinarlo todo","turn.position":"{kind} · turno {current}/{total}",
   "turn.kind.debate":"ronda {round}{ofRounds}","turn.ofRounds":" de {rounds}","turn.kind.blind":"respuesta independiente","turn.kind.revise":"revisión de su respuesta anterior","turn.kind.ballot":"clasificación entre pares","turn.kind.synth":"síntesis final",
   "ballot.parsed":"Clasificación detectada","ballot.note":"Detectada en la respuesta pegada. Revísala. Corrígela con los menús si el análisis falló. No se deduce nada de forma silenciosa.","ballot.confirmedManual":"Clasificación confirmada (ajustada manualmente)","ballot.bestFirst":"Clasificación detectada (mejor primero)","ballot.none":"Todavía no se detectó una clasificación. Pega una respuesta que contenga, por ejemplo, CLASIFICACIÓN: B > A > C","ballot.rankPosition":"Posición {number} de la clasificación","ballot.confirmOrder":"Confirmar el orden mostrado","ballot.reparse":"Analizar de nuevo la respuesta",
@@ -1783,7 +1809,14 @@ function canNavigateToTurn(index){
 }
 function navigateLaneToTurn(index){
   if(!canNavigateToTurn(index)||(index===state.cursor&&!state.ended)) return false;
-  state.cursor=index; state.ended=false; renderTurn(); return true;
+  const active=document.activeElement;
+  const fromLane=!!(active&&typeof active.closest==="function"&&active.closest("#lane"));
+  state.cursor=index; state.ended=false; renderTurn();
+  if(fromLane){
+    const station=$("lane").children[index];
+    if(station&&typeof station.focus==="function")station.focus({preventScroll:true});
+  }
+  return true;
 }
 function renderLane(){
   const lane=$("lane"); lane.innerHTML="";
@@ -1977,6 +2010,16 @@ function doneStatsText(){
   return lines.join("\n");
 }
 const KIND_TAG={debate:(turn,s)=>t("turn.kind.debate",{round:turn.round,ofRounds:s.recipe==="debate"?t("turn.ofRounds",{rounds:s.rounds}):""}),blind:()=>t("turn.kind.blind"),revise:()=>t("turn.kind.revise"),ballot:()=>t("turn.kind.ballot"),synth:()=>t("turn.kind.synth")};
+function focusIsStranded(){
+  const active=document.activeElement;
+  if(!active||active===document.body)return true;
+  return typeof active.closest==="function"?!!active.closest(".hidden"):false;
+}
+function focusIfStranded(target){
+  if(!target||!focusIsStranded())return false;
+  target.focus({preventScroll:true});
+  return true;
+}
 function renderTurn(focusAnswer=true){
   const done=state.ended||state.cursor>=state.turns.length;
   $("turnCard").classList.toggle("hidden",done);
@@ -1988,6 +2031,7 @@ function renderTurn(focusAnswer=true){
     $("doneMsg").textContent=n===0?t("done.none"):hasSynth?t("done.withSynth",{answers:countLabel("answer",n-1)}):t("done.withoutSynth",{answers:countLabel("answer",n)});
     const st=doneStatsText();
     $("doneStats").textContent=st; $("doneStats").classList.toggle("hidden",!st);
+    focusIfStranded($("doneHeading"));
     saveState(); return;
   }
   const turn=state.turns[state.cursor];
@@ -2149,6 +2193,7 @@ $("restart").onclick=()=>{
   lastSaveOk=null; lastSaveAt=null;
   $("storageWarn").classList.add("hidden"); $("run").classList.add("hidden"); $("setup").classList.remove("hidden");
   setUiLocale(uiLocale,false);
+  focusIfStranded($("question"));
   return true;
 };
 
@@ -2373,6 +2418,24 @@ function applyPendingImport(){
   if(captureBeforeDestructive(state||resumeOffer,"replace")==="blocked")return false;
   closeImportPreview(false); beginState(session); return true;
 }
+let shortcutsReturnFocus=null;
+function openShortcuts(){
+  shortcutsReturnFocus=document.activeElement&&typeof document.activeElement.focus==="function"?document.activeElement:null;
+  const dialog=$("shortcuts");
+  if(!dialog.open){ if(typeof dialog.showModal==="function")dialog.showModal(); else dialog.setAttribute("open",""); }
+  $("shortcutsHeading").focus({preventScroll:true});
+  return true;
+}
+function closeShortcuts(){
+  const dialog=$("shortcuts");
+  if(typeof dialog.close==="function"&&dialog.open)dialog.close(); else dialog.removeAttribute("open");
+  if(shortcutsReturnFocus&&typeof shortcutsReturnFocus.focus==="function")shortcutsReturnFocus.focus({preventScroll:true});
+  shortcutsReturnFocus=null;
+  return true;
+}
+$("shortcutsBtn").onclick=openShortcuts;
+$("shortcutsClose").onclick=closeShortcuts;
+$("shortcuts").addEventListener("cancel",()=>{ if(shortcutsReturnFocus&&typeof shortcutsReturnFocus.focus==="function")setTimeout(()=>shortcutsReturnFocus.focus({preventScroll:true}),0); shortcutsReturnFocus=null; });
 $("applyImport").onclick=applyPendingImport;
 $("closeImportPreview").onclick=$("cancelImportPreview").onclick=()=>closeImportPreview();
 $("importPreview").addEventListener("cancel",()=>{pendingImport=null;if(importReturnFocus)setTimeout(()=>importReturnFocus.focus({preventScroll:true}),0);});
