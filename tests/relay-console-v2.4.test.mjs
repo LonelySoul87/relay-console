@@ -2190,6 +2190,50 @@ test("every pointer target meets the minimum size",()=>{
   assert.match(html,/<label class="check" id="closingWrap"><input type="checkbox" id="closing">/);
 });
 
+test("a station click is routed by how it was produced, not by which handler ran",()=>{
+  // The click handler decides between the lane and the answer field from
+  // event.detail: a pointer click reports 1 or more, a click produced without a
+  // pointer reports 0. That second case is how assistive technology activates a
+  // button, so it must keep focus in the lane exactly like a real key press.
+  // Reverting the handler to always claim "pointer" left the rest of the suite
+  // green, so this needs its own assertion.
+  storage.clear();
+  const s=focusSession();
+  s.cursor=1;
+  app.setState(s);
+  app.renderTurn();
+  const stations=()=>document.getElementById("lane").children.filter(c=>c.tagName==="BUTTON");
+  const captured=JSON.stringify(s.answers);
+
+  // detail 0: produced without a pointer, so treat it as keyboard
+  stations()[0].focus();
+  stations()[0].onclick({target:stations()[0],detail:0});
+  assert.equal(app.getState().cursor,0,"the turn still changes");
+  assert.ok(document.activeElement.closest("#lane"),"a click with no pointer detail keeps focus in the lane");
+
+  // detail 1: a real pointer, so move to the work
+  stations()[1].focus();
+  stations()[1].onclick({target:stations()[1],detail:1});
+  assert.equal(app.getState().cursor,1);
+  assert.equal(document.activeElement.id,"answer","a pointer click moves to the answer field");
+
+  // a pointer click on the station that is already current still moves to the work
+  document.getElementById("answer").blur&&document.getElementById("answer").blur();
+  stations()[1].focus();
+  const before=app.getState().cursor;
+  stations()[1].onclick({target:stations()[1],detail:1});
+  assert.equal(app.getState().cursor,before,"no navigation is needed");
+  assert.equal(document.activeElement.id,"answer","but focus still lands on the answer");
+
+  // the same click without pointer detail is a no-op that leaves focus alone
+  stations()[1].focus();
+  stations()[1].onclick({target:stations()[1],detail:0});
+  assert.ok(document.activeElement.closest("#lane"),"keyboard activation of the current station stays put");
+
+  assert.equal(JSON.stringify(app.getState().answers),captured,"no route may alter a captured answer");
+  app.setState(null);storage.clear();
+});
+
 test("standalone privacy boundary remains intact",()=>{
   assert.match(html,/connect-src 'none'/);
   assert.doesNotMatch(html,/<script[^>]+src=/i);
