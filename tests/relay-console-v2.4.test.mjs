@@ -178,7 +178,8 @@ test("v2.4 release JavaScript loads in a minimal browser environment",()=>{
   assert.deepEqual(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url))),readFileSync(htmlPath));
   const sumBytes=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)));
   assert.equal(sumBytes.includes(13),false,"the checksum manifest must stay LF only, as .gitattributes pins it");
-  assert.equal(sumBytes.at(-1),10,"the manifest ends with a single newline");
+  assert.equal(sumBytes.at(-1),10,"the manifest ends with a newline");
+  assert.notEqual(sumBytes.at(-2),10,"the manifest ends with exactly one newline");
   const sums=sumBytes.toString("utf8");
   const expectedFiles=["relay-console-v1.8.2.html","relay-console-v1.8.3.html","relay-console-v1.8.4.html","relay-console-v1.9.0.html","relay-console-v2.0.0.html","relay-console-v2.1.0.html","relay-console-v2.2.0.html","relay-console-v2.3.0.html","relay-console-v2.4.0.html"];
   const sumLines=sums.trim().split(/\r?\n/);
