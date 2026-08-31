@@ -110,7 +110,7 @@ const sandbox={
 vm.createContext(sandbox);
 const exportsCode=`
 globalThis.__relayTest={
-  parseBallot,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
+  parseBallot,ballotAmbiguous,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   stripBidiMarks,foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,presetStatusNames,presetExportStatus,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
@@ -2449,6 +2449,125 @@ test("a ballot refuses direction overrides that can disguise the visible ranking
   ]) assert.equal(app.parseBallot(line,labels),null,"an override makes the ballot ambiguous");
   assert.deepEqual(plain(app.parseBallot("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u202bB > A > C\u202c",labels)),["B","A","C"],"a regular embedding remains compatible");
   assert.deepEqual(plain(app.parseBallot("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u2067B > A > C\u2069",labels)),["B","A","C"],"a regular isolate remains compatible");
+});
+
+test("an override is refused only on the line it can actually reorder",()=>{
+  // An unclosed override ends at the end of its paragraph, and a newline is a
+  // paragraph break, so an override in earlier prose cannot reach the ranking
+  // line. Measured in a browser at 14px monospace inside a dir="rtl" block, by
+  // reading the position of each label glyph:
+  //   override on the ranking line      stored B A C   reads C A B   ambiguous
+  //   override in an earlier paragraph  stored B A C   reads B A C   unambiguous
+  //   override closed before the line   stored B A C   reads B A C   unambiguous
+  // Refusing the whole reply therefore rejected ballots that no reader could
+  // have misread. A model that writes an override anywhere in its prose, or
+  // quotes text containing one, still gets its ranking counted.
+  const labels=["A","B","C"];
+  const expected=["B","A","C"];
+  const RLO="\u202e", LRO="\u202d", PDF="\u202c";
+  const AR="\u0627\u0644\u062a\u0631\u062a\u064a\u0628";
+
+  // still refused: the override sits on the ranking line
+  for(const line of [
+    AR+": "+LRO+"B > A > C"+PDF,
+    AR+": "+RLO+"B > A > C"+PDF,
+    "RANKING: "+LRO+"B > A > C"+PDF,
+    "RANKING: "+RLO+"B > A > C"+PDF,
+    RLO+"RANKING: B > A > C",
+    "RANKING: B > A > C"+RLO
+  ]) assert.equal(app.parseBallot(line,labels),null,"an override on the ranking line stays refused");
+
+  // now accepted: the override cannot reach the ranking line
+  for(const [why,text] of Object.entries({
+    "override in an earlier paragraph, unclosed": RLO+"\u0645\u0631\u0627\u062c\u0639\u0629\n\n"+AR+": B > A > C",
+    "override in an earlier paragraph, closed":   RLO+"\u0645\u0631\u0627\u062c\u0639\u0629"+PDF+"\n\n"+AR+": B > A > C",
+    "left to right override in earlier prose":    LRO+"note"+PDF+"\nRANKING: B > A > C",
+    "override in a later paragraph":              AR+": B > A > C\n\n"+RLO+"\u0645\u0644\u062d\u0648\u0638\u0629"
+  })) assert.deepEqual(plain(app.parseBallot(text,labels)),expected,why);
+
+  // the reader is told which of the two happened
+  assert.equal(app.ballotAmbiguous(AR+": "+RLO+"B > A > C"+PDF),true,"an override on the line is reported as ambiguous");
+  assert.equal(app.ballotAmbiguous(RLO+"prose\n\n"+AR+": B > A > C"),false,"an override elsewhere is not");
+  assert.equal(app.ballotAmbiguous("RANKING: B > A > C"),false,"a clean ballot is not ambiguous");
+  assert.equal(app.ballotAmbiguous("no ranking here at all"),false,"prose with no marker is not ambiguous");
+  assert.equal(app.ballotAmbiguous(""),false,"empty text is not ambiguous");
+
+  // every language carries the explanation, and it differs from the generic note
+  for(const locale of app.SUPPORTED_LOCALES){
+    const amb=app.I18N[locale]["ballot.ambiguous"];
+    assert.equal(typeof amb,"string");
+    assert.ok(amb.trim().length>0,locale+" explains the refusal");
+    assert.notEqual(amb,app.I18N[locale]["ballot.none"],locale+" does not repeat the generic advice");
+  }
+});
+
+test("a refused ballot says why instead of repeating advice already followed",()=>{
+  // Before this, an override made the header read "paste a reply containing e.g.
+  // RANKING: B > A > C" to a reader who had pasted exactly that. The header now
+  // distinguishes nothing found from found but ambiguous.
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"ballot"}
+  ];
+  const s=stateFor(turns,ps,["one","two",""]); s.cursor=2;
+  app.setState(s);
+  const head=document.getElementById("ballotHead");
+  const answer=document.getElementById("answer");
+
+  answer.value="I have not decided yet.";
+  app.renderBallotBox();
+  assert.equal(head.textContent,app.tr("en","ballot.none"),"nothing found reads as nothing found");
+
+  answer.value="RANKING: \u202eB > A\u202c";
+  app.renderBallotBox();
+  assert.equal(head.textContent,app.tr("en","ballot.ambiguous"),"an override is explained");
+  assert.equal(s.ballots[2],null,"and nothing is counted from it");
+
+  answer.value="RANKING: B > A";
+  app.updateBallotFromAnswer();
+  assert.deepEqual(plain(s.ballots[2]),["B","A"],"a clean ballot is still read");
+  app.renderBallotBox();
+  assert.equal(head.textContent,app.tr("en","ballot.bestFirst"));
+  app.setState(null);
+});
+
+test("lane geometry never follows the label direction",()=>{
+  // The lane is deliberately pinned left to right so progress reads as a
+  // timeline, while each station restores right to left for its Arabic label.
+  // Anything inside a station that positions itself on the inline axis therefore
+  // inherits the wrong direction. This has already happened twice: the connector
+  // was drawn a full station the wrong way, and the round label sat 62.34 pixels
+  // off its station. Measured in a browser, all 34 lane descendants now share the
+  // same centers in English and Arabic. This guard is what keeps a third case
+  // from being introduced silently.
+  const bodyOf=sel=>{
+    const at=html.indexOf(sel+"{");
+    if(at<0) return null;
+    return html.slice(at+sel.length+1,html.indexOf("}",at));
+  };
+  const LOGICAL=/(?:inset|margin|padding|border)-inline|text-align:\s*(?:start|end)|float:\s*inline/;
+  const rules=[...html.matchAll(/([^{}\n]+)\{([^}]*)\}/g)]
+    .map(m=>({sel:m[1].trim(),body:m[2]}))
+    .filter(r=>/(?:^|\s)\.(?:lane|lanewrap|station|lap|node|nm|bar)\b/.test(r.sel));
+  assert.ok(rules.length>=6,"the lane rules were found, got "+rules.length);
+  const offenders=[];
+  for(const r of rules){
+    if(!LOGICAL.test(r.body)) continue;
+    // a logical property is allowed only where the element's direction is pinned
+    // back to the lane, which is what makes the inline axis physical again
+    const bare=r.sel.replace(/^html\[dir="rtl"\]\s*/,"");
+    const pin=bodyOf('html[dir="rtl"] '+bare);
+    if(!pin||!/direction:ltr/.test(pin)) offenders.push(r.sel);
+  }
+  assert.deepEqual(offenders,[],
+    "these lane rules place themselves on the inline axis without pinning their direction to the lane");
+
+  // the two that were actually wrong, stated concretely
+  assert.match(html,/\.lap\{[^}]*left:50%/,"the round label uses the physical center of the timeline");
+  assert.doesNotMatch(html,/\.lap\{[^}]*inset-inline-start/,"the round label must not follow the label direction");
+  assert.match(html,/html\[dir="rtl"\] \.station \.bar\{direction:ltr\}/,"the connector stays pinned to the lane");
 });
 
 test("transcript search matches text that carries invisible direction marks",()=>{

@@ -55,6 +55,16 @@ right-to-left interface support.
   right-to-left direction while using a logical start offset, which shifted each
   label left even though the lane itself is a fixed left-to-right timeline.
 
+- Narrowed the direction override refusal to the ranking line itself. An
+  unclosed override ends at its paragraph and a newline is a paragraph break, so
+  an override in earlier prose cannot reorder a later line. Measured in a
+  browser: with the override on the ranking line a stored B A C reads as C A B,
+  while with it in an earlier paragraph it still reads B A C. Refusing on the
+  whole reply therefore rejected ballots that no reader could have misread.
+- A ballot refused as ambiguous now says so. It previously fell back to the
+  generic note asking the reader to paste a reply containing a ranking line,
+  which is what they had already done.
+
 ### Review status
 
 - All 343 automated checks pass across the current and historical suites.
