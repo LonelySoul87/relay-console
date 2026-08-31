@@ -1,5 +1,123 @@
 # Changelog
 
+## v2.4.0
+
+Feature release focused on safer file workflows, faster navigation, recovery,
+accessibility, and deeper everyday polish. The release theme is **Nothing is
+lost by accident**.
+
+### Added
+
+- **Bounded local recovery.** Before a restart, a saved-relay discard, or an
+  imported session replacing your work, Relay Console keeps one local recovery
+  copy. Restore and Remove are both offered directly, and the copy is removed
+  automatically after seven days.
+- **Honest autosave status.** The relay shows the time of the last successful
+  local save. A failed save stays visibly failed until a save succeeds, and never
+  reports a newer time than the last one that actually worked.
+- **Storage visibility.** The presets panel reports how much browser storage
+  Relay Console is using in total and for the session, presets, and recovery
+  copy, with specific guidance when space runs short.
+- **Import review before apply.** Session files and portable preset bundles are
+  validated and summarized before any active relay or local preset data changes.
+- **Session import details.** The review shows version, participants, turns,
+  captured-answer count, current position, plan, interface language, and prompt
+  language.
+- **Preset normalization warnings.** The review lists collision-safe renames,
+  removed non-web URLs, and roles shortened to the existing safety limit.
+
+### Fixed and hardened
+
+- Ballot dropdowns rebuilt after an earlier answer is removed now write only the
+  labels visible in the rebuilt ballot.
+- A manual ballot always offers direct re-parsing, even when its saved ranking no
+  longer matches the available answer labels.
+- The tally, transcript badge, Markdown transcript, and review packet now share
+  one definition of a valid effective ballot.
+- Discarding the saved relay from the resume bar now requires confirmation.
+- Changing the interface language during a relay keeps keyboard focus on the
+  language selector instead of moving it to the answer field.
+- Import previews render selected-file content only as text. Previewing does not
+  mutate the active relay or storage, and applying presets performs one write.
+- Preset imports now re-check current storage immediately before applying. If
+  another tab changed the saved presets, the review refreshes and no data is
+  overwritten.
+- Export all now preserves a directly importable file containing the first 50
+  valid presets even if browser storage was hand-edited beyond the supported
+  ceiling. Valid extras are named in the status and remain available through
+  Export selected.
+- Preset export failures now clear any stale success line and use a dedicated,
+  localized explanation instead of referring to an invalid imported file.
+- Website addresses longer than the 300-character safety limit are removed
+  instead of being silently shortened into a different working address.
+- Import review opens with focus on its heading so keyboard and screen-reader
+  users encounter the summary before either action.
+- Loading or importing a preset with more than 26 participants once again shows
+  the specific participant-limit explanation.
+- A relay larger than one megabyte is refused as a recovery copy rather than
+  being shortened. Relay Console now asks whether to continue without the copy,
+  so Cancel preserves the active work and gives the user time to save a file.
+- A recovery copy is validated through the same session validator as any import
+  before it can be restored, and unusable or expired data is dropped on sight.
+- Starting a new relay while the resume bar is visible now preserves the saved
+  relay in recovery before the new session replaces it.
+- A restored recovery copy remains available until the restored session has
+  autosaved successfully. Failed local storage can no longer consume the only
+  checkpoint.
+- Failed recovery writes now require an explicit choice before restart,
+  discard, or replacement continues.
+- Storage totals are labeled as estimates, account for browser string storage
+  instead of treating characters as bytes, and explain that quotas vary by
+  browser.
+- The saved-relay banner wraps long unbroken questions at phone width instead
+  of creating horizontal page scrolling.
+- Restart and discard confirmations now describe the seven-day recovery window
+  instead of claiming that the action can never be undone.
+
+- A restore that is waiting for a successful autosave is now tied to the exact
+  checkpoint it came from, so an ordinary later save can never delete a
+  different checkpoint captured in the meantime.
+- Continuing a destructive action after a failed or oversize replacement now
+  disarms the earlier restore relationship. A later save cannot delete the old
+  checkpoint that remained in storage.
+- A backward clock correction no longer destroys a valid recovery checkpoint.
+  Only a date more than a day ahead is treated as bogus.
+- Every stored size the user can see now uses one unit, so the recovery ceiling
+  and the storage report cannot disagree by a factor of two.
+- Typing a question or editing the roster no longer re-measures all of local
+  storage on every keystroke.
+
+- The recovery banner now announces itself to assistive technology when it
+  arrives, and its Restore and Remove buttons carry names that say what they
+  act on.
+- A replacement recovery checkpoint is announced even when its visible summary
+  happens to match the previous checkpoint.
+
+- The preset dropdown now always leaves a real preset selected, so Load, Rename,
+  Duplicate, Export selected, and Delete can never act on a preset the control is
+  not showing.
+- A failed preset delete now says that deleting failed, removes any success line,
+  and can name an unnamed entry by its position.
+- Preset names are compared one way everywhere, so a preset saved by an older
+  release cannot end up sharing an identity with a newer one.
+- Download filenames stay portable when a long name is truncated, and an unusable
+  date degrades to a marker rather than a broken stamp.
+
+- Finishing a relay, wrapping up early, and starting over no longer leave keyboard
+  focus on a hidden control. Focus moves to the completion heading or back to the
+  question, and an ordinary redraw never takes focus off a control you are using.
+- Activating a lane station from the keyboard keeps focus in the lane, so you can
+  keep exploring without being thrown back to the answer field on every step. A
+  pointer click moves directly to the answer for the selected turn.
+- A keyboard shortcut reference is available from the turn card.
+- The roster reorder arrows now meet the minimum pointer target size.
+
+### Privacy
+
+- Discarded or replaced work can now remain in local browser storage for up to
+  seven days unless you remove it. The footer privacy note states this in
+  English, French, and Spanish. Nothing is ever uploaded.
+
 ## v2.3.0
 
 Feature release focused on portable workflows and safer independent review
