@@ -1,8 +1,8 @@
 # Changelog
 
-## v2.4.0 draft
+## v2.4.0
 
-Development draft focused on safer file workflows, faster navigation, recovery,
+Feature release focused on safer file workflows, faster navigation, recovery,
 accessibility, and deeper everyday polish. The release theme is **Nothing is
 lost by accident**.
 

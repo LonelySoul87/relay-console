@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {existsSync,readFileSync,readdirSync} from "node:fs";
 import {join} from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import {fileURLToPath} from "node:url";
 
-const htmlPath=fileURLToPath(new URL("../relay-console-v2.4.0-draft.html",import.meta.url));
+const htmlPath=fileURLToPath(new URL("../relay-console-v2.4.0.html",import.meta.url));
 const html=readFileSync(htmlPath,"utf8");
 const scriptStart=html.indexOf("<script>")+8;
 const scriptEnd=html.lastIndexOf("</script>");
@@ -128,7 +129,7 @@ globalThis.__relayTest={
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;globalThis.__confirmReplies=[];},setConfirmReplies(values){globalThis.__confirmReplies=values.slice();},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
 };`;
-vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.4.0-draft.html"});
+vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.4.0.html"});
 const app=sandbox.__relayTest;
 
 function participant(id,name){return {id,name,color:"#10a37f",url:"",role:""};}
@@ -141,10 +142,10 @@ function samplePreset(overrides={}){
     ],recipe:"dcr",customSteps:[{pi:0,kind:"blind",role:"",roleKey:"drafter"}],rounds:2,closing:true,format:"markdown",promptLocale:"fr",...overrides
   };
 }
-function presetBundle(presets){return {kind:"relay-console-presets",formatVersion:1,app:"2.4.0-draft",exported:"2026-08-28T00:00:00.000Z",presets};}
+function presetBundle(presets){return {kind:"relay-console-presets",formatVersion:1,app:"2.4.0",exported:"2026-08-28T00:00:00.000Z",presets};}
 function stateFor(turns,participants,answers){
   return {
-    version:"2.4.0-draft",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
+    version:"2.4.0",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
     participants,turns,synthPid:null,answers,forward:turns.map(()=>null),stale:turns.map(()=>false),prompts:turns.map(()=>null),
     promptStale:turns.map(()=>false),draftAnswers:turns.map(()=>null),review:turns.map(()=>false),ballots:turns.map(()=>null),ballotManual:turns.map(()=>false),cursor:0,ended:false,ts:1
   };
@@ -158,12 +159,13 @@ function renderedTurnIndexes(){
   return document.getElementById("transcript").children.filter(el=>el.classList.contains("entry")).map(el=>+el.getAttribute("data-turn-index"));
 }
 
-test("v2.4 draft JavaScript loads in a minimal browser environment",()=>{
+test("v2.4 release JavaScript loads in a minimal browser environment",()=>{
   assert.equal(typeof app.parseBallot,"function");
   assert.equal(app.MAX_PARTICIPANTS,26);
-  assert.match(html,/<title>Relay Console v2\.4\.0 draft<\/title>/);
-  assert.match(html,/const VERSION="2\.4\.0-draft";/);
-  assert.match(html,/<span class="ver">v2\.4\.0 draft<\/span>/);
+  assert.match(html,/<title>Relay Console v2\.4\.0<\/title>/);
+  assert.match(html,/const VERSION="2\.4\.0";/);
+  assert.match(html,/<span class="ver">v2\.4\.0<\/span>/);
+  assert.doesNotMatch(html,/v2\.4\.0 draft|2\.4\.0-draft/);
   assert.doesNotMatch(html,/v2\.3\.0/);
   assert.match(html,/id="uiLocale"/);
   assert.match(html,/id="promptLocale"/);
@@ -173,6 +175,18 @@ test("v2.4 draft JavaScript loads in a minimal browser environment",()=>{
   const contentWrites=[...html.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(match=>match[1].trim()).filter(value=>value!=="\"\"");
   assert.deepEqual(contentWrites,["t(el.dataset.i18nHtml,{version:VERSION})"]);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
+  assert.deepEqual(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url))),readFileSync(htmlPath));
+  const sums=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)),"utf8");
+  const expectedFiles=["relay-console-v1.8.2.html","relay-console-v1.8.3.html","relay-console-v1.8.4.html","relay-console-v1.9.0.html","relay-console-v2.0.0.html","relay-console-v2.1.0.html","relay-console-v2.2.0.html","relay-console-v2.3.0.html","relay-console-v2.4.0.html"];
+  const sumLines=sums.trim().split(/\r?\n/);
+  assert.equal(sumLines.length,expectedFiles.length);
+  for(const [i,line] of sumLines.entries()){
+    const match=line.match(/^([0-9a-f]{64})  (relay-console-v[0-9.]+\.html)$/);
+    assert.ok(match,line);
+    assert.equal(match[2],expectedFiles[i]);
+    const releaseBytes=readFileSync(fileURLToPath(new URL(`../${match[2]}`,import.meta.url)));
+    assert.equal(createHash("sha256").update(releaseBytes).digest("hex"),match[1],match[2]);
+  }
 });
 
 test("all active product, planning, and repository text contains no em dashes",()=>{
@@ -751,10 +765,10 @@ test("selected preset inspection is localized and treats invalid storage as untr
 test("export filenames are dated, private, portable, and visibly confirmed",()=>{
   const stamp=new Date(2026,7,29,23,45,0);
   assert.equal(app.exportDateStamp(stamp),"2026-08-29");
-  assert.equal(app.exportFilename("preset","json","Décision: <Team>/A",stamp),"relay-preset-decision-team-a-2026-08-29-v2.4.0-draft.json");
-  assert.equal(app.exportFilename("transcript","md","",stamp),"relay-transcript-2026-08-29-v2.4.0-draft.md");
+  assert.equal(app.exportFilename("preset","json","Décision: <Team>/A",stamp),"relay-preset-decision-team-a-2026-08-29-v2.4.0.json");
+  assert.equal(app.exportFilename("transcript","md","",stamp),"relay-transcript-2026-08-29-v2.4.0.md");
   assert.doesNotMatch(app.exportFilename("session","json","PRIVATE QUESTION",stamp),/[<>:\\/?*]/);
-  const filename="relay-session-2026-08-29-v2.4.0-draft.json";
+  const filename="relay-session-2026-08-29-v2.4.0.json";
   app.showExportStatus(filename);
   const status=document.getElementById("exportStatus");
   assert.equal(status.classList.contains("hidden"),false);
@@ -779,9 +793,9 @@ test("relay download controls use the filename helper and do not mutate the sess
     document.getElementById("reviewPacketBtn").onclick();
   }finally{document.createElement=originalCreate;}
   assert.equal(JSON.stringify(s),before);
-  assert.match(requested[0],/^relay-transcript-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.md$/);
-  assert.match(requested[1],/^relay-session-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.json$/);
-  assert.match(requested[2],/^relay-review-packet-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.md$/);
+  assert.match(requested[0],/^relay-transcript-\d{4}-\d{2}-\d{2}-v2\.4\.0\.md$/);
+  assert.match(requested[1],/^relay-session-\d{4}-\d{2}-\d{2}-v2\.4\.0\.json$/);
+  assert.match(requested[2],/^relay-review-packet-\d{4}-\d{2}-\d{2}-v2\.4\.0\.md$/);
   assert.match(document.getElementById("exportStatus").textContent,new RegExp(requested[2].replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
@@ -803,7 +817,7 @@ test("selected preset export contains one validated preset and leaves the librar
   const bundle=JSON.parse(await blob.text());
   assert.equal(JSON.stringify(app.Store.loadPresets()),before);
   assert.deepEqual(bundle.presets.map(p=>p.name),["Décision équipe"]);
-  assert.match(requested,/^relay-preset-decision-equipe-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.json$/);
+  assert.match(requested,/^relay-preset-decision-equipe-\d{4}-\d{2}-\d{2}-v2\.4\.0\.json$/);
   assert.match(document.getElementById("presetStatus").textContent,new RegExp(requested.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
@@ -811,7 +825,7 @@ test("portable preset export has a versioned privacy-safe envelope",()=>{
   const bundle=plain(app.exportPresetBundle([samplePreset({question:"DO NOT EXPORT",answers:["SECRET"],unknown:"drop"})]));
   assert.equal(bundle.kind,"relay-console-presets");
   assert.equal(bundle.formatVersion,1);
-  assert.equal(bundle.app,"2.4.0-draft");
+  assert.equal(bundle.app,"2.4.0");
   assert.equal(bundle.presets.length,1);
   assert.equal("question" in bundle.presets[0],false);
   assert.equal("answers" in bundle.presets[0],false);
@@ -861,7 +875,7 @@ test("bulk preset export preserves a valid 50-entry file and reports every extra
   try{document.getElementById("presetExport").onclick();}
   finally{document.createElement=originalCreate;sandbox.URL.createObjectURL=originalCreateUrl;}
   const downloaded=JSON.parse(await blob.text());
-  assert.match(requested,/^relay-presets-\d{4}-\d{2}-\d{2}-v2\.4\.0-draft\.json$/);
+  assert.match(requested,/^relay-presets-\d{4}-\d{2}-\d{2}-v2\.4\.0\.json$/);
   assert.equal(downloaded.presets.length,50);
   assert.deepEqual(downloaded.presets.map(p=>p.name),valid.slice(0,50).map(p=>p.name));
   assert.match(document.getElementById("presetStatus").textContent,/P51/);
@@ -1923,13 +1937,13 @@ test("export filenames stay portable at the truncation boundary and for unusable
 test("a newer download confirmation is never cleared by an older timer",()=>{
   sandbox.__timers.length=0;
   const status=document.getElementById("exportStatus");
-  app.showExportStatus("relay-transcript-2026-08-29-v2.4.0-draft.md");
+  app.showExportStatus("relay-transcript-2026-08-29-v2.4.0.md");
   assert.match(status.textContent,/relay-transcript-2026-08-29/);
   assert.equal(status.classList.contains("hidden"),false);
   const first=sandbox.__timers.filter(timer=>timer.delay===6000);
   assert.equal(first.length,1,"a confirmation schedules exactly one clear");
 
-  app.showExportStatus("relay-session-2026-08-29-v2.4.0-draft.json");
+  app.showExportStatus("relay-session-2026-08-29-v2.4.0.json");
   assert.match(status.textContent,/relay-session-2026-08-29/);
   first[0].callback();                                  // the stale timer must not fire
   assert.match(status.textContent,/relay-session-2026-08-29/,"an older timer must not clear a newer confirmation");

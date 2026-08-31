@@ -63,7 +63,7 @@ The goal is not to remove the human from the loop. The goal is to make the loop 
 
 Relay Console runs entirely in your browser. It loads no remote fonts, scripts, or trackers, and its Content-Security-Policy blocks remote subresources and programmatic network connections. The app never uploads your questions, answers, or session data. When you explicitly click **Copy & open**, the browser opens the provider homepage you configured; anything you then paste into that provider is handled under its own terms.
 
-Autosave uses your browser's local storage, so your session survives a refresh when you run the saved file. Inside a sandboxed preview that storage may be blocked, so the **Save file** button is always there for a hard backup.
+Autosave uses your browser's local storage, so your session survives a refresh when you run the saved file. Before supported destructive actions, Relay Console can retain one bounded recovery copy for up to seven days unless you remove it sooner. The presets panel shows estimated storage use, and the **Save file** button remains the durable backup when browser storage is blocked or full.
 
 Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles and can override the app's light theme. If the theme toggle seems to do nothing, exempt this page in the extension.
 
@@ -80,9 +80,18 @@ Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles an
 - **Roles and reordering.** Give a model a job (skeptic, evidence checker, implementer) and set the running order.
 - **Curated context.** Each answer keeps its captured original; you can trim or drop what gets forwarded to later models without altering the record.
 - **Editable prompts** that persist per turn, with a live token estimate.
+- **Review before import.** Inspect a validated summary of a session or portable
+  preset bundle before it can replace active work or change saved presets.
+- **Bounded recovery and honest autosave.** Restore one recent local checkpoint
+  after supported destructive actions, see the last successful save, and review
+  estimated storage use without uploading anything.
+- **Long-relay navigation.** Filter the transcript by participant, turn type,
+  round, state, or text, then revisit reached turns through an accessible lane
+  without changing captured answers.
 - **Portable presets.** Save a roster plus settings under a name, export up to
-  50 presets as a privacy-safe JSON bundle, and import them on another browser
-  or computer without including questions or answers.
+  50 presets as a privacy-safe JSON bundle, inspect, rename, duplicate, or
+  export one selection, and import them on another browser or computer without
+  including questions or answers.
 - **Review packets.** Export a compact Markdown handoff for independent review
   with captured answers, context decisions, warnings, roles, and ballot results,
   without duplicating generated prompts.
@@ -96,7 +105,8 @@ Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles an
   keep the active turn card beside the transcript.
 - **Light and dark themes** that follow your system, with a header toggle
   to force either and remember your choice.
-- **Markdown and JSON export/import**, plus first-run guidance for newcomers.
+- **Portable, dated exports** for sessions, transcripts, review packets, and
+  presets, plus first-run guidance and a keyboard shortcut reference.
 
 ## How Relay Console compares
 
@@ -127,7 +137,7 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v2.3.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
+Each release is a self-contained file named by version (for example `relay-console-v2.4.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
 
 ## Verify a download
 

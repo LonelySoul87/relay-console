@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import {createHash} from "node:crypto";
 import {existsSync,readFileSync,readdirSync} from "node:fs";
 import {join} from "node:path";
 import test from "node:test";
@@ -119,18 +118,6 @@ test("v2.3 release JavaScript loads in a minimal browser environment",()=>{
   assert.match(html,/id="promptLocale"/);
   assert.match(html,/registerLocale\("es","Español",ES\)/);
   assert.match(html,/data-starter="dcr"/);
-  assert.deepEqual(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url))),readFileSync(htmlPath));
-  const sums=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)),"utf8");
-  const expectedFiles=["relay-console-v1.8.2.html","relay-console-v1.8.3.html","relay-console-v1.8.4.html","relay-console-v1.9.0.html","relay-console-v2.0.0.html","relay-console-v2.1.0.html","relay-console-v2.2.0.html","relay-console-v2.3.0.html"];
-  const sumLines=sums.trim().split(/\r?\n/);
-  assert.equal(sumLines.length,expectedFiles.length);
-  for(const [i,line] of sumLines.entries()){
-    const match=line.match(/^([0-9a-f]{64})  (relay-console-v[0-9.]+\.html)$/);
-    assert.ok(match,line);
-    assert.equal(match[2],expectedFiles[i]);
-    const releaseBytes=readFileSync(fileURLToPath(new URL(`../${match[2]}`,import.meta.url)));
-    assert.equal(createHash("sha256").update(releaseBytes).digest("hex"),match[1],match[2]);
-  }
   assert.match(html,/el\.innerHTML=t\(el\.dataset\.i18nHtml/);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
 });
