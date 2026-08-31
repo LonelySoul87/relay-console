@@ -216,7 +216,9 @@
   .station .bar{height:4px;border-radius:3px;background:var(--line);position:absolute;top:18px;inset-inline-start:50%;width:100%;z-index:0;transition:background .5s ease}
   .station .bar.lit{background:linear-gradient(90deg,var(--signal),var(--signal-2))}
   .station:last-child .bar{display:none}
-  .lap{position:absolute;top:-14px;inset-inline-start:50%;transform:translateX(-50%);font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--accent-text);white-space:nowrap;padding:1px 7px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+  /* Round labels belong to the lane's fixed left-to-right timeline. A physical
+     center keeps their geometry stable while their Arabic text remains RTL. */
+  .lap{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--accent-text);white-space:nowrap;padding:1px 7px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
   .node{position:relative;z-index:2;width:16px;height:16px;border-radius:50%;background:var(--bg);border:2px solid var(--line);margin:11px auto 10px;transition:transform .3s,background .3s,border-color .3s,box-shadow .3s}
   .node.done{border-color:currentColor;background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 16%,transparent)}
   .node.active{border-color:var(--signal);background:var(--signal);transform:scale(1.45);animation:pulse 1.9s ease-in-out infinite}
@@ -1746,9 +1748,12 @@ function scorables(idx){
   return out;
 }
 const BIDI_MARKS=/[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/g;
+const BIDI_OVERRIDES=/[\u202d\u202e]/;
 function stripBidiMarks(value){ return String(value==null?"":value).replace(BIDI_MARKS,""); }
 function parseBallot(text,labels){
-  const lines=stripBidiMarks(text).split(/\r?\n/).filter(line=>/^\s*(?:RANKING|CLASSEMENT|CLASIFICACI[ÓO]N|RANGLISTE|الترتيب)\s*:/i.test(line));
+  const raw=String(text==null?"":text);
+  if(BIDI_OVERRIDES.test(raw)) return null;
+  const lines=stripBidiMarks(raw).split(/\r?\n/).filter(line=>/^\s*(?:RANKING|CLASSEMENT|CLASIFICACI[ÓO]N|RANGLISTE|الترتيب)\s*:/i.test(line));
   if(lines.length!==1) return null;
   const m=lines[0].match(/^\s*(?:RANKING|CLASSEMENT|CLASIFICACI[ÓO]N|RANGLISTE|الترتيب)\s*:\s*([A-Z](?:\s*(?:>|≻|,|\u060c)\s*[A-Z])*)\s*$/i);
   if(!m) return null;

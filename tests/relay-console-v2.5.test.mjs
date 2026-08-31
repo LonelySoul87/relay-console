@@ -2320,6 +2320,22 @@ test("the lane connector follows the lane, not the direction of its label",()=>{
   assert.match(html,/bar\.setAttribute\("aria-hidden","true"\)/,"the connector stays hidden from assistive technology");
 });
 
+test("round labels stay centered on the fixed lane timeline in Arabic",()=>{
+  // The label is inside a station whose direction becomes RTL for Arabic. Logical
+  // inline-start positioning therefore moves its origin to the right, while the
+  // existing negative X translation still moves left. In a live browser this put
+  // every Arabic round label 62.34 pixels left of its station center, even though
+  // the same labels were centered within 0.001 pixels in English. Lane geometry is
+  // deliberately fixed left to right, so the label needs a physical center while
+  // its own Arabic text keeps the inherited reading direction.
+  const lap=html.match(/\.lap\{([^}]*)\}/);
+  assert.ok(lap,"round labels must have their own rule");
+  assert.match(lap[1],/(?:^|;)left:50%(?:;|$)/,"the label uses the lane's physical center");
+  assert.doesNotMatch(lap[1],/inset-inline-start/,'logical start must not inherit the Arabic station direction');
+  assert.match(lap[1],/transform:translateX\(-50%\)/,"the label centers its own width around the station center");
+  assert.match(html,/lap\.setAttribute\("aria-hidden","true"\)/,"the visual label remains excluded from the station's accessible name");
+});
+
 test("every pointer target meets the minimum size",()=>{
   // The roster reorder arrows were 19.6 by 18.6 CSS pixels and sit directly above
   // one another, so the spacing exception did not apply.
@@ -2416,6 +2432,23 @@ test("a ballot line survives the invisible direction marks that right-to-left re
   assert.equal(app.stripBidiMarks("\u200fB\u200e>\u061cA\u202b\u202c\u2066\u2069"),"B>A");
   assert.equal(app.stripBidiMarks("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A"),"\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A","Arabic letters are untouched");
   assert.equal(app.stripBidiMarks("caf\u00e9 na\u00efve stra\u00dfe"),"caf\u00e9 na\u00efve stra\u00dfe","accents and eszett are untouched");
+});
+
+test("a ballot refuses direction overrides that can disguise the visible ranking order",()=>{
+  const labels=["A","B","C"];
+  // LRO and RLO can force characters to display in an order that disagrees with
+  // their stored order. Removing either control and counting the remaining text
+  // would therefore risk recording a different vote from the one the user sees.
+  // Embeddings and isolates do not override the strong Latin label directions and
+  // remain accepted by the compatibility test above.
+  for(const line of [
+    "\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u202dB > A > C\u202c",
+    "\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u202eB > A > C\u202c",
+    "RANKING: \u202dB > A > C\u202c",
+    "RANKING: \u202eB > A > C\u202c"
+  ]) assert.equal(app.parseBallot(line,labels),null,"an override makes the ballot ambiguous");
+  assert.deepEqual(plain(app.parseBallot("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u202bB > A > C\u202c",labels)),["B","A","C"],"a regular embedding remains compatible");
+  assert.deepEqual(plain(app.parseBallot("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u2067B > A > C\u2069",labels)),["B","A","C"],"a regular isolate remains compatible");
 });
 
 test("transcript search matches text that carries invisible direction marks",()=>{
