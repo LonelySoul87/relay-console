@@ -111,7 +111,7 @@ vm.createContext(sandbox);
 const exportsCode=`
 globalThis.__relayTest={
   parseBallot,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
-  foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
+  stripBidiMarks,foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,presetStatusNames,presetExportStatus,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
@@ -2296,6 +2296,30 @@ test("the keyboard reference opens, is announced, and gives focus back",()=>{
   assert.doesNotMatch(app.I18N.en["shortcuts.note"],/Every shortcut uses a modifier/);
 });
 
+test("the lane connector follows the lane, not the direction of its label",()=>{
+  // The lane is pinned left to right in every language so progress always reads as
+  // a timeline. Each station then restores right to left so its Arabic label reads
+  // correctly, and the connector, which lives inside the station, inherited that
+  // flip. Because the connector is placed with inset-inline-start, every segment
+  // was drawn one station the wrong way in Arabic: the first hung off the edge of
+  // the page and the segment before the last station was missing entirely. The lit
+  // segments carry progress, so the completed run was shown against the wrong pair.
+  const bar=html.match(/\.station \.bar\{([^}]*)\}/);
+  assert.ok(bar,"the connector must have its own rule");
+  assert.match(bar[1],/inset-inline-start:50%/,"the connector is placed on the inline axis");
+  assert.match(html,/html\[dir="rtl"\] \.lane\{direction:ltr\}/,"the lane stays a left to right timeline");
+  assert.match(html,/html\[dir="rtl"\] \.station\{direction:rtl\}/,"the station label reads right to left");
+  // the override that keeps the two from disagreeing
+  assert.match(html,/html\[dir="rtl"\] \.station \.bar\{direction:ltr\}/,
+    "the connector must be pinned back to the lane direction");
+  // and it has to win, so it must come after the rule that flips the station
+  const flip=html.indexOf('html[dir="rtl"] .station{direction:rtl}');
+  const pin=html.indexOf('html[dir="rtl"] .station .bar{direction:ltr}');
+  assert.ok(flip>=0&&pin>flip,"the override follows the rule it corrects");
+  // the connector is decoration only, so pinning its direction changes nothing read aloud
+  assert.match(html,/bar\.setAttribute\("aria-hidden","true"\)/,"the connector stays hidden from assistive technology");
+});
+
 test("every pointer target meets the minimum size",()=>{
   // The roster reorder arrows were 19.6 by 18.6 CSS pixels and sit directly above
   // one another, so the spacing exception did not apply.
@@ -2349,6 +2373,75 @@ test("a station click is routed by how it was produced, not by which handler ran
 
   assert.equal(JSON.stringify(app.getState().answers),captured,"no route may alter a captured answer");
   app.setState(null);storage.clear();
+});
+
+test("a ballot line survives the invisible direction marks that right-to-left replies carry",()=>{
+  // An assistant writing Arabic around Latin letters routinely emits U+200F, the
+  // Arabic letter mark, or an embedding, so the mixed line displays correctly.
+  // Those characters survive copy and paste and are invisible on screen, so a
+  // ranking that looks exactly right was silently refused with nothing for the
+  // reader to see. The marks are stripped for comparison only.
+  const labels=["A","B","C"];
+  const expected=["B","A","C"];
+  const marked={
+    "leading right-to-left mark":"\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C",
+    "leading left-to-right mark":"\u200e\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C",
+    "Arabic letter mark":"\u061c\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C",
+    "mark after the colon":"\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u200fB > A > C",
+    "marks between the letters":"\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B\u200f > \u200fA > C",
+    "wrapped in an embedding":"\u202b\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C\u202c",
+    "wrapped in an isolate":"\u2067\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C\u2069"
+  };
+  for(const [label,line] of Object.entries(marked)){
+    assert.deepEqual(plain(app.parseBallot(line,labels)),expected,label+" must still parse");
+  }
+  // the same marks must not rescue a line that is genuinely wrong
+  assert.equal(app.parseBallot("\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > B > C",labels),null,"a repeated label is still rejected");
+  assert.equal(app.parseBallot("\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A",labels),null,"a partial ranking is still rejected");
+  assert.equal(app.parseBallot("\u200f\u0631\u062a\u0628\u062a\u0647\u0627 \u0643\u0627\u0644\u062a\u0627\u0644\u064a B > A > C",labels),null,"prose is still rejected");
+
+  // the Arabic comma is the natural list separator in Arabic prose, exactly as
+  // the plain comma already was for the other languages
+  assert.deepEqual(plain(app.parseBallot("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B\u060c A\u060c C",labels)),expected);
+  assert.deepEqual(plain(app.parseBallot("RANKING: B, A, C",labels)),expected,"the plain comma still works");
+
+  // every language still parses its own marker unchanged
+  const markers={en:"RANKING",fr:"CLASSEMENT",es:"CLASIFICACION",de:"RANGLISTE",ar:"\u0627\u0644\u062a\u0631\u062a\u064a\u0628"};
+  for(const [locale,marker] of Object.entries(markers)){
+    assert.deepEqual(plain(app.parseBallot(marker+": B > A > C",labels)),expected,locale);
+  }
+  assert.deepEqual(plain(app.parseBallot("CLASIFICACI\u00d3N: B > A > C",labels)),expected,"accented Spanish");
+
+  // the helper itself removes only invisible formatting, never content
+  assert.equal(app.stripBidiMarks("\u200fB\u200e>\u061cA\u202b\u202c\u2066\u2069"),"B>A");
+  assert.equal(app.stripBidiMarks("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A"),"\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A","Arabic letters are untouched");
+  assert.equal(app.stripBidiMarks("caf\u00e9 na\u00efve stra\u00dfe"),"caf\u00e9 na\u00efve stra\u00dfe","accents and eszett are untouched");
+});
+
+test("transcript search matches text that carries invisible direction marks",()=>{
+  // A pasted right-to-left answer can hold a direction mark inside a word. The
+  // reader types the word without it, so the search has to fold both the same way.
+  assert.equal(app.foldTranscriptText("Rev\u200fision"),app.foldTranscriptText("revision"));
+  assert.equal(app.foldTranscriptText("\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628"),app.foldTranscriptText("\u0627\u0644\u062a\u0631\u062a\u064a\u0628"));
+  assert.equal(app.foldTranscriptText("\u202bALPHA\u202c"),app.foldTranscriptText("alpha"));
+  // folding still does its original jobs
+  assert.equal(app.foldTranscriptText("R\u00c9VISION"),"revision","accents and case still fold");
+  assert.equal(app.foldTranscriptText("Clasificaci\u00f3n"),"clasificacion");
+
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"}
+  ];
+  const s=stateFor(turns,ps,["\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628 marked answer","ordinary answer"]);
+  const captured=JSON.stringify(s.answers);
+  app.setState(s);
+  app.setTranscriptFilters({query:"\u0627\u0644\u062a\u0631\u062a\u064a\u0628"});
+  assert.equal(app.transcriptTurnMatches(0),true,"a marked answer is found by the unmarked word");
+  assert.equal(app.transcriptTurnMatches(1),false);
+  assert.equal(JSON.stringify(app.getState().answers),captured,"searching never rewrites a captured answer");
+  app.setTranscriptFilters({});
+  app.setState(null);
 });
 
 test("standalone privacy boundary remains intact",()=>{

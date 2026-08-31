@@ -28,9 +28,29 @@ right-to-left interface support.
   direction, narrow-layout, privacy, and no-em-dash regression coverage to all
   five languages.
 
+### Fixed
+
+- Ballot lines are now read correctly when they carry the invisible direction
+  marks that right-to-left replies routinely include. Assistants and editors
+  insert these characters so mixed Arabic and Latin text displays correctly, and
+  they survive copying, so a ranking that looked exactly right on screen was
+  silently refused with nothing for the reader to see. The marks are removed for
+  comparison only, so nothing stored, displayed, or exported changes.
+- The Arabic comma is accepted as a ballot separator, matching the plain comma
+  already accepted in the other languages.
+- Transcript search now matches text containing those same invisible marks, so a
+  pasted answer can be found by typing the word without them.
+- Corrected the relay lane's progress connector under right-to-left layout. The
+  lane is pinned to a left-to-right timeline while each station restores
+  right-to-left for its label, and the connector inherited the station's
+  direction. Every segment was drawn one station the wrong way in Arabic, the
+  first hung off the edge of the page, the segment before the last station was
+  missing, and because lit segments carry progress the completed run was shown
+  against the wrong pair of stations.
+
 ### Review status
 
-- All 338 automated checks pass across the current and historical suites.
+- All 341 automated checks pass across the current and historical suites.
 - Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
   without clipping, horizontal overflow, warning, or error.
 - German and Arabic wording should receive an independent peer or fluent-human
