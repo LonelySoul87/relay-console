@@ -282,7 +282,7 @@
   .badge.excl{color:var(--danger);border-color:var(--danger)}
   .badge.vote{color:var(--teal);border-color:var(--teal)}
   .staletag{font-family:var(--mono);font-size:10px;color:var(--danger)}
-  .linkbtn{background:none;border:none;color:var(--accent-text);font-size:12px;cursor:pointer;padding:0;font-weight:600}
+  .linkbtn{background:none;border:none;color:var(--accent-text);font-size:12px;cursor:pointer;padding:4px 0;min-width:24px;min-height:24px;font-weight:600}
   .linkbtn:hover{text-decoration:underline}
   .curate{margin-top:9px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:11px}
   .curate textarea{min-height:84px;font-family:var(--mono);font-size:12.5px}
@@ -1751,24 +1751,28 @@ const BIDI_MARKS=/[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/g;
 const BIDI_OVERRIDES=/[\u202d\u202e]/;
 function stripBidiMarks(value){ return String(value==null?"":value).replace(BIDI_MARKS,""); }
 const BALLOT_MARKER=/^\s*(?:RANKING|CLASSEMENT|CLASIFICACI[ÓO]N|RANGLISTE|الترتيب)\s*:/i;
+const BALLOT_RANKING=/^\s*(?:RANKING|CLASSEMENT|CLASIFICACI[ÓO]N|RANGLISTE|الترتيب)\s*:\s*([A-Z](?:\s*(?:>|≻|,|\u060c)\s*[A-Z])*)\s*$/i;
 function ballotMarkerLines(text){
   return String(text==null?"":text).split(/\r?\n/).filter(line=>BALLOT_MARKER.test(stripBidiMarks(line)));
+}
+function parseBallotLine(line,labels){
+  const m=stripBidiMarks(line).match(BALLOT_RANKING);
+  if(!m) return null;
+  const out=m[1].toUpperCase().split(/\s*(?:>|≻|,|\u060c)\s*/);
+  return isExactRanking(out,labels)?out:null;
 }
 /* True when the single ranking line carries a direction override, so the order a
    reader sees can disagree with the order that would be stored. The reader is
    told this rather than being asked to paste what they already pasted. */
-function ballotAmbiguous(text){
+function ballotAmbiguous(text,labels){
   const lines=ballotMarkerLines(text);
-  return lines.length===1&&BIDI_OVERRIDES.test(lines[0]);
+  return lines.length===1&&BIDI_OVERRIDES.test(lines[0])&&!!parseBallotLine(lines[0],labels);
 }
 function parseBallot(text,labels){
   const lines=ballotMarkerLines(text);
   if(lines.length!==1) return null;
   if(BIDI_OVERRIDES.test(lines[0])) return null;
-  const m=stripBidiMarks(lines[0]).match(/^\s*(?:RANKING|CLASSEMENT|CLASIFICACI[ÓO]N|RANGLISTE|الترتيب)\s*:\s*([A-Z](?:\s*(?:>|≻|,|\u060c)\s*[A-Z])*)\s*$/i);
-  if(!m) return null;
-  const out=m[1].toUpperCase().split(/\s*(?:>|≻|,|\u060c)\s*/);
-  return isExactRanking(out,labels)?out:null;
+  return parseBallotLine(lines[0],labels);
 }
 function isExactRanking(rank,labels){
   return Array.isArray(rank)&&Array.isArray(labels)&&labels.length>0&&rank.length===labels.length&&new Set(rank).size===labels.length&&rank.every(L=>labels.includes(L));
@@ -1827,7 +1831,7 @@ function renderBallotBox(){
   const manual=!!(state.ballotManual&&state.ballotManual[state.cursor]);
   box.classList.remove("hidden");
   box.classList.toggle("unparsed",!current);
-  $("ballotHead").textContent=current?(manual?t("ballot.confirmedManual"):t("ballot.bestFirst")):(ballotAmbiguous($("answer").value)?t("ballot.ambiguous"):t("ballot.none"));
+  $("ballotHead").textContent=current?(manual?t("ballot.confirmedManual"):t("ballot.bestFirst")):(ballotAmbiguous($("answer").value,labels)?t("ballot.ambiguous"):t("ballot.none"));
   const ranks=$("ballotRanks"); ranks.innerHTML="";
   if(!labels.length) return;
   const order=current||labels;

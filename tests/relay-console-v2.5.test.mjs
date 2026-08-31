@@ -2343,6 +2343,12 @@ test("every pointer target meets the minimum size",()=>{
   assert.ok(rule,"the reorder arrows must have their own rule");
   assert.match(rule[1],/min-width:24px/);
   assert.match(rule[1],/min-height:24px/);
+  // Link-style actions are standalone buttons, including transcript curation
+  // and coach dismissal. They previously rendered at 72 by 16 CSS pixels.
+  const linkRule=html.match(/\.linkbtn\{([^}]*)\}/);
+  assert.ok(linkRule,"link-style buttons must have their own rule");
+  assert.match(linkRule[1],/min-width:24px/);
+  assert.match(linkRule[1],/min-height:24px/);
   // the closing checkbox is small but its label is the target, so it is exempt
   assert.match(html,/<label class="check" id="closingWrap"><input type="checkbox" id="closing">/);
 });
@@ -2486,11 +2492,13 @@ test("an override is refused only on the line it can actually reorder",()=>{
   })) assert.deepEqual(plain(app.parseBallot(text,labels)),expected,why);
 
   // the reader is told which of the two happened
-  assert.equal(app.ballotAmbiguous(AR+": "+RLO+"B > A > C"+PDF),true,"an override on the line is reported as ambiguous");
-  assert.equal(app.ballotAmbiguous(RLO+"prose\n\n"+AR+": B > A > C"),false,"an override elsewhere is not");
-  assert.equal(app.ballotAmbiguous("RANKING: B > A > C"),false,"a clean ballot is not ambiguous");
-  assert.equal(app.ballotAmbiguous("no ranking here at all"),false,"prose with no marker is not ambiguous");
-  assert.equal(app.ballotAmbiguous(""),false,"empty text is not ambiguous");
+  assert.equal(app.ballotAmbiguous(AR+": "+RLO+"B > A > C"+PDF,labels),true,"an otherwise valid override ballot is reported as ambiguous");
+  assert.equal(app.ballotAmbiguous(RLO+"prose\n\n"+AR+": B > A > C",labels),false,"an override elsewhere is not");
+  assert.equal(app.ballotAmbiguous("RANKING: B > A > C",labels),false,"a clean ballot is not ambiguous");
+  assert.equal(app.ballotAmbiguous("RANKING: "+RLO+"B > A"+PDF,labels),false,"an incomplete ballot is not misreported as an override-only refusal");
+  assert.equal(app.ballotAmbiguous("RANKING: "+RLO+"not a ranking"+PDF,labels),false,"a malformed ballot is not misreported as an override-only refusal");
+  assert.equal(app.ballotAmbiguous("no ranking here at all",labels),false,"prose with no marker is not ambiguous");
+  assert.equal(app.ballotAmbiguous("",labels),false,"empty text is not ambiguous");
 
   // every language carries the explanation, and it differs from the generic note
   for(const locale of app.SUPPORTED_LOCALES){

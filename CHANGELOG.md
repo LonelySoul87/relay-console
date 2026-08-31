@@ -64,10 +64,15 @@ right-to-left interface support.
 - A ballot refused as ambiguous now says so. It previously fell back to the
   generic note asking the reader to paste a reply containing a ranking line,
   which is what they had already done.
+- The ambiguity explanation is shown only when removing the direction control
+  would leave an otherwise valid, complete ranking. Malformed and partial lines
+  continue to use the ordinary not-parsed explanation.
+- Link-style transcript and coaching actions now meet the 24 by 24 CSS-pixel
+  minimum pointer target size. They previously rendered only 16 pixels high.
 
 ### Review status
 
-- All 343 automated checks pass across the current and historical suites.
+- All 346 automated checks pass across the current and historical suites.
 - Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
   without clipping, horizontal overflow, warning, or error.
 - German and Arabic wording should receive an independent peer or fluent-human
