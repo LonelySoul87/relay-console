@@ -1,5 +1,41 @@
 # Changelog
 
+## v2.5.0 (in development)
+
+Language expansion focused on complete German and Arabic workflows, including
+right-to-left interface support.
+
+### Added
+
+- Complete German and Arabic catalogs for the interface, generated prompts,
+  transcript exports, review packets, import summaries, recovery, storage, and
+  accessibility labels.
+- Explicit locale direction metadata. Arabic switches the interface to
+  right-to-left layout while German and the existing languages remain
+  left-to-right.
+- German `RANGLISTE:` and Arabic `الترتيب:` ballot markers, parsed with the same
+  strict full-ranking rules as the existing English, French, and Spanish forms.
+- Automatic text direction for user-entered questions, names, roles, answers,
+  prompts, transcript bodies, and forwarded-context edits.
+
+### Changed and hardened
+
+- Replaced physical left and right layout rules with logical start and end
+  edges where direction should follow the interface language.
+- Kept the relay lane's progress geometry stable in both directions while its
+  station text follows the interface direction.
+- Extended catalog parity, placeholder, prompt, ballot, session, transcript,
+  direction, narrow-layout, privacy, and no-em-dash regression coverage to all
+  five languages.
+
+### Review status
+
+- All 338 automated checks pass across the current and historical suites.
+- Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
+  without clipping, horizontal overflow, warning, or error.
+- German and Arabic wording should receive an independent peer or fluent-human
+  review before publication.
+
 ## v2.4.0
 
 Feature release focused on safer file workflows, faster navigation, recovery,
