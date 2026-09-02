@@ -69,7 +69,7 @@ Note: dark-mode browser extensions (e.g. Dark Reader) inject their own styles an
 
 ## Features
 
-- **English, French, and Spanish.** Choose the interface language and generated-prompt
+- **English, French, Spanish, German, and Arabic.** Choose the interface language and generated-prompt
   language independently, so the controls and the AI conversation do not have
   to use the same language.
 - **ChatGPT and Claude quick starts.** Apply an editable two-model setup for
@@ -137,7 +137,7 @@ Versions of this tool are critiqued by running questions through the tool itself
 
 ## Versioning
 
-Each release is a self-contained file named by version (for example `relay-console-v2.4.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
+Each release is a self-contained file named by version (for example `relay-console-v2.5.0.html`). Draft builds may include a `-draft` suffix. There is no upgrade step; download the new file. Saved sessions and presets from older versions import into newer ones. v2 recipe sessions may contain fields older v1.x builds do not fully understand.
 
 ## Verify a download
 
@@ -177,7 +177,7 @@ Support is optional. Relay Console remains free, offline, and usable without acc
 
 ## Contributing
 
-Issues and pull requests welcome, especially provider-list updates that follow the four rules above. Because the whole thing is one file with no build, a change is just an edit to that file.
+[Bug reports and feature requests](https://github.com/LonelySoul87/relay-console/issues/new/choose) are welcome, especially provider-list updates that follow the four rules above. GitHub issues are public, so do not attach private questions, answers, provider conversations, or Relay Console session files. Because the whole thing is one file with no build, a change is just an edit to that file.
 
 Contributions require agreement to the [Contributor License Agreement](CLA.md), which lets the maintainer include your work in both the GPL and commercial editions while you keep ownership of it. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 

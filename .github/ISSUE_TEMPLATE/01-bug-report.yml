@@ -1,0 +1,108 @@
+name: Bug report
+description: Report reproducible behavior that does not work as expected.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Relay Console.
+
+        GitHub issues are public. Do not paste private questions, answers, session files, recovery data, or provider conversations. Report suspected security or privacy vulnerabilities through the private security contact instead.
+  - type: input
+    id: version
+    attributes:
+      label: Relay Console version
+      description: The version shown beside the Relay Console title.
+      placeholder: For example, v2.5.0
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: How did you open Relay Console?
+      options:
+        - Downloaded HTML file
+        - GitHub Pages
+        - Repository development draft
+        - Another preview
+    validations:
+      required: true
+  - type: dropdown
+    id: interface_language
+    attributes:
+      label: Interface language
+      options:
+        - English
+        - French
+        - Spanish
+        - German
+        - Arabic
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use a new relay without private content when possible.
+      placeholder: |
+        1. Open...
+        2. Select...
+        3. Press...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+      description: Describe the visible result or error.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and operating system
+      placeholder: For example, Firefox 142 on Windows 11
+    validations:
+      required: true
+  - type: dropdown
+    id: input_method
+    attributes:
+      label: Input method involved
+      options:
+        - Mouse or trackpad
+        - Keyboard
+        - Touchscreen
+        - Screen reader or other assistive technology
+        - Not input related
+    validations:
+      required: true
+  - type: input
+    id: assistive_technology
+    attributes:
+      label: Assistive technology
+      description: Optional. Include the name and version only when relevant.
+      placeholder: For example, NVDA 2026.1
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Additional evidence
+      description: Optional. Remove private content from screenshots and do not attach session files.
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues for the same problem.
+          required: true
+        - label: This report contains no private questions, answers, session files, or provider conversations.
+          required: true
+        - label: This is not a security or privacy vulnerability that should be reported privately.
+          required: true

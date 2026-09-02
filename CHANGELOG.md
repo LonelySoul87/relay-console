@@ -1,5 +1,153 @@
 # Changelog
 
+## v2.5.0
+
+Feature release focused on complete German and Arabic workflows, including
+right-to-left interface support.
+
+### Added
+
+- Complete German and Arabic catalogs for the interface, generated prompts,
+  transcript exports, review packets, import summaries, recovery, storage, and
+  accessibility labels.
+- Explicit locale direction metadata. Arabic switches the interface to
+  right-to-left layout while German and the existing languages remain
+  left-to-right.
+- German `RANGLISTE:` and Arabic `الترتيب:` ballot markers, parsed with the same
+  strict full-ranking rules as the existing English, French, and Spanish forms.
+- Automatic text direction for user-entered questions, names, roles, answers,
+  prompts, transcript bodies, and forwarded-context edits.
+
+### Changed and hardened
+
+- Replaced physical left and right layout rules with logical start and end
+  edges where direction should follow the interface language.
+- Kept the relay lane's progress geometry stable in both directions while its
+  station text follows the interface direction.
+- Extended catalog parity, placeholder, prompt, ballot, session, transcript,
+  direction, narrow-layout, privacy, and no-em-dash regression coverage to all
+  five languages.
+
+### Fixed
+
+- Ballot lines are now read correctly when they carry the invisible direction
+  marks that right-to-left replies routinely include. Assistants and editors
+  insert these characters so mixed Arabic and Latin text displays correctly, and
+  they survive copying, so a ranking that looked exactly right on screen was
+  silently refused with nothing for the reader to see. The marks are removed for
+  comparison only, so nothing stored, displayed, or exported changes.
+- Explicit left-to-right and right-to-left override controls are refused in a
+  ballot. Unlike ordinary marks, embeddings, and isolates, an override can make
+  the visible label order disagree with the stored order, so removing it before
+  counting could record a different vote from the one the user sees.
+- The Arabic comma is accepted as a ballot separator, matching the plain comma
+  already accepted in the other languages.
+- Transcript search now matches text containing those same invisible marks, so a
+  pasted answer can be found by typing the word without them.
+- Corrected the relay lane's progress connector under right-to-left layout. The
+  lane is pinned to a left-to-right timeline while each station restores
+  right-to-left for its label, and the connector inherited the station's
+  direction. Every segment was drawn one station the wrong way in Arabic, the
+  first hung off the edge of the page, the segment before the last station was
+  missing, and because lit segments carry progress the completed run was shown
+  against the wrong pair of stations.
+- Centered Arabic round labels on their stations. They inherited the station's
+  right-to-left direction while using a logical start offset, which shifted each
+  label left even though the lane itself is a fixed left-to-right timeline.
+
+- Narrowed the direction override refusal to the ranking line itself. An
+  unclosed override ends at its paragraph and a newline is a paragraph break, so
+  an override in earlier prose cannot reorder a later line. Measured in a
+  browser: with the override on the ranking line a stored B A C reads as C A B,
+  while with it in an earlier paragraph it still reads B A C. Refusing on the
+  whole reply therefore rejected ballots that no reader could have misread.
+- A ballot refused as ambiguous now says so. It previously fell back to the
+  generic note asking the reader to paste a reply containing a ranking line,
+  which is what they had already done.
+- The ambiguity explanation is shown only when removing the direction control
+  would leave an otherwise valid, complete ranking. Malformed and partial lines
+  continue to use the ordinary not-parsed explanation.
+- Link-style transcript and coaching actions now meet the 24 by 24 CSS-pixel
+  minimum pointer target size. They previously rendered only 16 pixels high.
+
+- Arabic now spells counted nouns with the forms the language actually
+  distinguishes. Arabic has six count categories where English has two, so a
+  catalog built on the English pair could not spell the dual, and could not spell
+  the form used from 11 upward, where the counted noun returns to the singular.
+  Two answers read as the plural rather than the dual, and eleven answers read as
+  the plural rather than the singular. A language now receives its full set of
+  categories only once its own catalog supplies one of the extra forms, so
+  English, French, Spanish, and German render exactly as they did before.
+- Catalogs must declare either none of the extra count forms or exactly the ones
+  their language distinguishes, so a count cannot land on a form the language
+  does not have.
+- Preset summaries and review packets now use the same plural-category selector
+  as the completion, statistics, recovery, score, and transcript surfaces.
+- A regression guard protects the existing ballot-render order so arriving at a
+  ballot turn continues to report that turn's answer rather than the previous
+  one.
+
+- The page no longer refuses to open where platform plural support is missing,
+  incomplete, or lacks data for a language. A platform answer is used only when
+  it resolves the requested language and supplies both a category list and a
+  selector function.
+- The Arabic rule now travels with the file, so Arabic counts stay correct on a
+  runtime that has no data for it. The carried rule is authoritative for Arabic,
+  and a check holds it against the platform wherever the platform does know
+  Arabic, so the two cannot drift apart.
+- The import preview counts participants instead of always saying participants. It
+  spelled the noun inside the sentence and passed a bare number, so a preset
+  holding one participant read as "1 participants" in English, "1 participantes"
+  in Spanish, and the plural at every count in Arabic.
+
+- A review packet now names an unassigned synthesis turn from the catalog. The
+  turn carries the literal name the plan builder gave it, which the transcript
+  already replaced with the localized label, but the packet printed the stored
+  name, so a German or Arabic packet carried an English heading. The packet is
+  written in the prompt language, which is not always the interface language, so
+  the lookup takes the locale rather than assuming the interface one.
+
+- Arabic completion, recovery, and ballot-count messages now keep shared dual
+  labels in standalone nominative positions instead of placing `ان` forms where
+  the surrounding grammar requires `ين`.
+- Arabic recovery reasons after `قبل أن` now use the present forms `تبدأ`,
+  `تتجاهل`, and `تفتح`. The two-point score label now uses `نقطتان`.
+- Arabic code-format instructions now use `تعليمات برمجية` and `شفرة` instead of
+  the misleading word `رمز` for programming code.
+- German recovery action names no longer describe the checkpoint as already
+  restored. Recovery, privacy, plan, shortcut, and prompt wording received a
+  focused grammar and clarity pass.
+
+- Corrected four light-theme colors, in both automatic and manually selected
+  light mode, that failed the 4.5 to 1 contrast minimum for normal text: the
+  warning color, the success color, the peer-ranking color, and the link color
+  on raised surfaces. Measured in a browser, the worst was the warning color at
+  3.77 to 1 behind text such as a failed save or a stale answer.
+- Fixed two colors that were requested but never defined. The starter
+  confirmation asked for a success color that does not exist and the transcript
+  filter controls asked for a font that does not exist, so both silently fell
+  back to whatever they inherited.
+- The contrast check now reads the list of text colors out of the stylesheet
+  instead of naming them by hand, covers the automatic and manual theme blocks,
+  and requires every color requested by the stylesheet to exist.
+
+### Review status
+
+- All 358 automated checks pass across the current and historical suites.
+- Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
+  without clipping, horizontal overflow, warning, or error.
+- An evidence-backed reciprocal agent review has resolved the known German and
+  Arabic wording defects. Native-tone and regional-preference feedback remains
+  welcome through the public issue forms after release.
+- No physical touchscreen or screen-reader listening session has been completed.
+  The development machine reports no touch digitizer. Automated focus,
+  accessible-name, live-region, keyboard, target-size, and reflow checks pass,
+  while the two unavailable human checks remain documented post-release
+  feedback areas rather than release blockers.
+- Added privacy-aware GitHub bug and feature forms and a localized in-app link
+  to the issue chooser. Public reports warn against including private relay
+  content, while suspected security or privacy vulnerabilities stay private.
+
 ## v2.4.0
 
 Feature release focused on safer file workflows, faster navigation, recovery,

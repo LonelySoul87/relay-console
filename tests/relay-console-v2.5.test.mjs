@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {existsSync,readFileSync,readdirSync} from "node:fs";
 import {join} from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import {fileURLToPath} from "node:url";
 
-const htmlPath=fileURLToPath(new URL("../relay-console-v2.4.0.html",import.meta.url));
+const htmlPath=fileURLToPath(new URL("../relay-console-v2.5.0.html",import.meta.url));
 const html=readFileSync(htmlPath,"utf8");
+const bugForm=readFileSync(fileURLToPath(new URL("../.github/ISSUE_TEMPLATE/01-bug-report.yml",import.meta.url)),"utf8");
+const featureForm=readFileSync(fileURLToPath(new URL("../.github/ISSUE_TEMPLATE/02-feature-request.yml",import.meta.url)),"utf8");
+const issueConfig=readFileSync(fileURLToPath(new URL("../.github/ISSUE_TEMPLATE/config.yml",import.meta.url)),"utf8");
 const scriptStart=html.indexOf("<script>")+8;
 const scriptEnd=html.lastIndexOf("</script>");
 assert.ok(scriptStart>=8&&scriptEnd>scriptStart,"embedded application script is present");
@@ -104,13 +108,13 @@ const sandbox={
   alert(message){sandbox.__alerts.push(String(message));},confirm(){return sandbox.__confirmReplies.length?sandbox.__confirmReplies.shift():sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},
   setTimeout(callback,delay=0){const id=++sandbox.__nextTimerId;sandbox.__timers.push({id,callback,delay});return id;},
   clearTimeout(id){sandbox.__timers=sandbox.__timers.filter(timer=>timer.id!==id);},
-  Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error
+  Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error,Intl
 };
 vm.createContext(sandbox);
 const exportsCode=`
 globalThis.__relayTest={
-  parseBallot,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
-  foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
+  parseBallot,ballotAmbiguous,registerLocale,pluralSuffix,pluralRuleFor,BUILTIN_PLURAL,countLabel,pointLabel,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
+  stripBidiMarks,foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,presetStatusNames,presetExportStatus,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
   PRESET_BUNDLE_KIND,PRESET_BUNDLE_VERSION,MAX_PRESETS,MAX_CUSTOM_STEPS,MAX_PRESET_FILE_BYTES,
@@ -128,7 +132,7 @@ globalThis.__relayTest={
   setPromptReply(value){globalThis.__promptReply=value;},setConfirmReply(value){globalThis.__confirmReply=value;globalThis.__confirmReplies=[];},setConfirmReplies(values){globalThis.__confirmReplies=values.slice();},
   setState(value){state=value;},getState(){return state;},getRecipe(){return recipe;},getUiLocale(){return uiLocale;},getPromptLocale(){return promptLocale;},getParts(){return parts;},getFormat(){return fmt;}
 };`;
-vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.4.0.html"});
+vm.runInContext(html.slice(scriptStart,scriptEnd)+exportsCode,sandbox,{filename:"relay-console-v2.5.0.html"});
 const app=sandbox.__relayTest;
 
 function participant(id,name){return {id,name,color:"#10a37f",url:"",role:""};}
@@ -141,10 +145,10 @@ function samplePreset(overrides={}){
     ],recipe:"dcr",customSteps:[{pi:0,kind:"blind",role:"",roleKey:"drafter"}],rounds:2,closing:true,format:"markdown",promptLocale:"fr",...overrides
   };
 }
-function presetBundle(presets){return {kind:"relay-console-presets",formatVersion:1,app:"2.4.0",exported:"2026-08-28T00:00:00.000Z",presets};}
+function presetBundle(presets){return {kind:"relay-console-presets",formatVersion:1,app:"2.5.0",exported:"2026-08-28T00:00:00.000Z",presets};}
 function stateFor(turns,participants,answers){
   return {
-    version:"2.4.0",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
+    version:"2.5.0",question:"Which answer is strongest?",recipe:"ballot",mode:"blind",rounds:1,closing:true,format:"markdown",uiLocale:"en",promptLocale:"en",nonce:"RXTEST1234",
     participants,turns,synthPid:null,answers,forward:turns.map(()=>null),stale:turns.map(()=>false),prompts:turns.map(()=>null),
     promptStale:turns.map(()=>false),draftAnswers:turns.map(()=>null),review:turns.map(()=>false),ballots:turns.map(()=>null),ballotManual:turns.map(()=>false),cursor:0,ended:false,ts:1
   };
@@ -158,22 +162,124 @@ function renderedTurnIndexes(){
   return document.getElementById("transcript").children.filter(el=>el.classList.contains("entry")).map(el=>+el.getAttribute("data-turn-index"));
 }
 
-test("v2.4 release JavaScript loads in a minimal browser environment",()=>{
+test("v2.5 release JavaScript loads in a minimal browser environment",()=>{
   assert.equal(typeof app.parseBallot,"function");
   assert.equal(app.MAX_PARTICIPANTS,26);
-  assert.match(html,/<title>Relay Console v2\.4\.0<\/title>/);
-  assert.match(html,/const VERSION="2\.4\.0";/);
-  assert.match(html,/<span class="ver">v2\.4\.0<\/span>/);
-  assert.doesNotMatch(html,/v2\.4\.0 draft|2\.4\.0-draft/);
-  assert.doesNotMatch(html,/v2\.3\.0/);
+  assert.match(html,/<title>Relay Console v2\.5\.0<\/title>/);
+  assert.match(html,/const VERSION="2\.5\.0";/);
+  assert.match(html,/<span class="ver">v2\.5\.0<\/span>/);
+  assert.doesNotMatch(html,/v2\.5\.0 draft|2\.5\.0-draft/);
+  assert.doesNotMatch(html,/v2\.4\.0/);
   assert.match(html,/id="uiLocale"/);
   assert.match(html,/id="promptLocale"/);
   assert.match(html,/registerLocale\("es","Español",ES\)/);
+  assert.match(html,/registerLocale\("de","Deutsch",DE\)/);
+  assert.match(html,/registerLocale\("ar","العربية",AR,"rtl"\)/);
   assert.match(html,/data-starter="dcr"/);
   assert.match(html,/el\.innerHTML=t\(el\.dataset\.i18nHtml/);
   const contentWrites=[...html.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(match=>match[1].trim()).filter(value=>value!=="\"\"");
   assert.deepEqual(contentWrites,["t(el.dataset.i18nHtml,{version:VERSION})"]);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
+  assert.deepEqual(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url))),readFileSync(htmlPath));
+  const sumBytes=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)));
+  assert.equal(sumBytes.includes(13),false,"the checksum manifest must stay LF only, as .gitattributes pins it");
+  assert.equal(sumBytes.at(-1),10,"the manifest ends with a newline");
+  assert.notEqual(sumBytes.at(-2),10,"the manifest ends with exactly one newline");
+  const sums=sumBytes.toString("utf8");
+  const expectedFiles=["relay-console-v1.8.2.html","relay-console-v1.8.3.html","relay-console-v1.8.4.html","relay-console-v1.9.0.html","relay-console-v2.0.0.html","relay-console-v2.1.0.html","relay-console-v2.2.0.html","relay-console-v2.3.0.html","relay-console-v2.4.0.html","relay-console-v2.5.0.html"];
+  const sumLines=sums.trim().split(/\r?\n/);
+  assert.equal(sumLines.length,expectedFiles.length);
+  for(const [i,line] of sumLines.entries()){
+    const match=line.match(/^([0-9a-f]{64})  (relay-console-v[0-9.]+\.html)$/);
+    assert.ok(match,line);
+    assert.equal(match[2],expectedFiles[i]);
+    const releaseBytes=readFileSync(fileURLToPath(new URL(`../${match[2]}`,import.meta.url)));
+    assert.equal(createHash("sha256").update(releaseBytes).digest("hex"),match[1],match[2]);
+  }
+});
+
+test("public feedback is discoverable, localized, and keeps private reports out of issues",()=>{
+  const chooser="https://github.com/LonelySoul87/relay-console/issues/new/choose";
+  assert.match(html,new RegExp(`<a href="${chooser.replaceAll("/","\\/")}" target="_blank" rel="noopener noreferrer" data-i18n="footer\\.feedback">`));
+  assert.match(html,/\.feedback a\{[^}]*min-height:24px/);
+  const privacyCopy={
+    en:"Reports submitted on GitHub are public. Do not include private questions, answers, session files, or provider conversations.",
+    fr:"Les signalements publiés sur GitHub sont publics. N’y ajoutez aucun contenu privé, notamment des questions, réponses, fichiers de session ou conversations avec un fournisseur.",
+    es:"Las incidencias publicadas en GitHub son públicas. No incluyas contenido privado, como preguntas, respuestas, archivos de sesión o conversaciones con un proveedor.",
+    de:"Auf GitHub veröffentlichte Meldungen sind öffentlich. Füge keine privaten Inhalte wie Fragen, Antworten, Sitzungsdateien oder Unterhaltungen mit Anbietern hinzu.",
+    ar:"البلاغات المنشورة على GitHub علنية. لا ترفق محتوى خاصا، مثل الأسئلة أو الإجابات أو ملفات الجلسات أو محادثات المزودين."
+  };
+  for(const locale of ["en","fr","es","de","ar"]){
+    assert.ok(app.I18N[locale]["footer.feedback"].trim(),`${locale} names the feedback action`);
+    assert.equal(app.I18N[locale]["footer.feedbackPrivacy"],privacyCopy[locale],`${locale} warns that reports are public without inviting private content`);
+  }
+  assert.match(bugForm,/^name: Bug report$/m);
+  assert.match(bugForm,/id: steps/);
+  assert.match(bugForm,/id: interface_language/);
+  assert.match(bugForm,/id: input_method/);
+  assert.match(bugForm,/contains no private questions, answers, session files, or provider conversations/);
+  assert.match(featureForm,/^name: Feature request$/m);
+  assert.match(featureForm,/id: privacy/);
+  assert.match(featureForm,/private, offline, dependency-free, single-file tool/);
+  assert.match(issueConfig,/^blank_issues_enabled: false$/m);
+  assert.match(issueConfig,/SECURITY\.md/);
+  assert.match(issueConfig,/Do not disclose suspected security or privacy vulnerabilities in a public issue/);
+});
+
+test("light and dark color tokens keep normal text at accessible contrast",()=>{
+  const block=(pattern,name)=>{
+    const match=html.match(pattern);
+    assert.ok(match,name+" theme block exists");
+    return match[1];
+  };
+  const blocks={
+    systemDark:block(/  :root\{([\s\S]*?)\n  \}/,"system dark"),
+    systemLight:block(/@media \(prefers-color-scheme: light\)\{\s*:root\{([\s\S]*?)\n    \}/,"system light"),
+    manualDark:block(/:root\[data-theme="dark"\]\{([\s\S]*?)\n  \}/,"manual dark"),
+    manualLight:block(/:root\[data-theme="light"\]\{([\s\S]*?)\n  \}/,"manual light")
+  };
+  const readTokens=block=>Object.fromEntries([...block.matchAll(/(--[\w-]+):(#(?:[0-9a-fA-F]{6}))/g)].map(match=>[match[1],match[2]]));
+  const rgb=hex=>[1,3,5].map(at=>Number.parseInt(hex.slice(at,at+2),16));
+  const luminance=hex=>{
+    const channels=rgb(hex).map(value=>value/255).map(value=>value<=0.04045?value/12.92:Math.pow((value+0.055)/1.055,2.4));
+    return 0.2126*channels[0]+0.7152*channels[1]+0.0722*channels[2];
+  };
+  const contrast=(a,b)=>{
+    const x=luminance(a),y=luminance(b);
+    return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);
+  };
+  // The list of text colours is read from the stylesheet rather than written out
+  // here, so a colour introduced later is covered without anyone remembering to
+  // add it. A hand-written list had left the warning colour, the peer-ranking
+  // colour and the success colour unchecked, and all three were failing.
+  const style=html.slice(html.indexOf("<style>"),html.indexOf("</style>"));
+  const painted=[...new Set([...style.matchAll(/(?:^|[;{\s])color\s*:\s*var\((--[\w-]+)\)/g)].map(match=>match[1]))];
+  assert.ok(painted.length>=8,"the stylesheet's text colours were found, got "+painted.length);
+  for(const token of ["--danger","--ok","--teal","--accent-text","--muted"])
+    assert.ok(painted.includes(token),token+" is painted as text and must be checked");
+  // Every surface a reader can meet text on. The button ink is the one colour
+  // never painted on these: it sits on the accent gradient, so it is measured
+  // against that instead.
+  const surfaces=["--bg","--bg-2","--panel","--prompt-bg"];
+  const onAccent={"--btn-ink":["--signal","--signal-2"]};
+  for(const [theme,block] of Object.entries(blocks)){
+    const tokens=readTokens(block);
+    for(const token of painted){
+      const backgrounds=onAccent[token]||surfaces;
+      for(const background of backgrounds){
+        const value=tokens[token],behind=tokens[background];
+        if(!value||!behind) continue;   // a token the theme does not redefine
+        assert.ok(contrast(value,behind)>=4.5,
+          `${theme} ${token} on ${background} meets 4.5 to 1, got ${contrast(value,behind).toFixed(2)}`);
+      }
+    }
+  }
+  // every colour the stylesheet asks for has to exist, or the text silently
+  // falls back to whatever it inherits
+  const requested=[...new Set([...style.matchAll(/var\((--[\w-]+)\)/g)].map(match=>match[1]))];
+  const defined=new Set(Object.values(blocks).flatMap(theme=>Object.keys(readTokens(theme))).concat(
+    [...style.matchAll(/(--[\w-]+)\s*:/g)].map(match=>match[1])));
+  for(const token of requested) assert.ok(defined.has(token),token+" is used but never defined");
 });
 
 test("all active product, planning, and repository text contains no em dashes",()=>{
@@ -197,17 +303,515 @@ test("ballot parser accepts one explicit, exact ranking line",()=>{
   assert.deepEqual(Array.from(app.parseBallot("CLASSEMENT : C > A > B",["A","B","C"])),["C","A","B"]);
   assert.deepEqual(Array.from(app.parseBallot("CLASIFICACIÓN: A > C > B",["A","B","C"])),["A","C","B"]);
   assert.deepEqual(Array.from(app.parseBallot("CLASIFICACION: B > C > A",["A","B","C"])),["B","C","A"]);
+  assert.deepEqual(Array.from(app.parseBallot("RANGLISTE: C > B > A",["A","B","C"])),["C","B","A"]);
+  assert.deepEqual(Array.from(app.parseBallot("الترتيب: B > A > C",["A","B","C"])),["B","A","C"]);
+});
+
+// Boot the page again in a fresh context with a chosen Intl, to see what a
+// runtime with reduced locale data would do with this file.
+function bootWith(intlImpl){
+  const els=new Map();
+  const doc={
+    activeElement:null,documentElement:new FakeElement("html","html"),body:new FakeElement("body","body"),
+    getElementById(id){if(!els.has(id))els.set(id,new FakeElement(SELECT_IDS.has(id)?"select":"div",id));return els.get(id);},
+    createElement(tag){return new FakeElement(tag);},querySelectorAll(){return [];},addEventListener(){},execCommand(){return false;}
+  };
+  const store=new Map();
+  const box={console,document:doc,
+    localStorage:{setItem(k,v){store.set(String(k),String(v));},getItem(k){return store.has(String(k))?store.get(String(k)):null;},removeItem(k){store.delete(String(k));}},
+    navigator:{clipboard:null},window:{open(){},matchMedia(){return{matches:false};}},
+    Blob,URL,FileReader:FakeFileReader,alert(){},confirm(){return true;},prompt(){return null;},
+    setTimeout(){return 0;},clearTimeout(){},
+    Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error,Intl:intlImpl};
+  vm.createContext(box);
+  try{
+    vm.runInContext(html.slice(scriptStart,scriptEnd)+"globalThis.__probe={countedMessage,pluralSuffix,pluralRuleFor,registerLocale,I18N,SUPPORTED_LOCALES};",box,{filename:"reboot"});
+    return {loaded:true,app:box.__probe};
+  }catch(err){ return {loaded:false,error:String(err&&err.message)}; }
+}
+
+test("the import preview counts participants instead of always saying participants",()=>{
+  // The preview spelled the noun inside the sentence and passed a bare number,
+  // so a preset holding one participant read as "1 participants" in English,
+  // "1 participantes" in Spanish, and the plural in Arabic at every count.
+  const line=(locale,n)=>{
+    const before=app.getUiLocale();
+    app.setUiLocale(locale);
+    app.renderImportPreview({kind:"presets",value:{presets:[]},merged:[],imported:[],warnings:[],
+      summary:{count:1,items:[{name:"QA",participants:n,recipe:"blind"}]}});
+    const text=document.getElementById("importPreviewItems").children[0].textContent;
+    app.closeImportPreview();
+    app.setUiLocale(before||"en");
+    return text;
+  };
+  assert.match(line("en",1),/QA · 1 participant ·/,"one participant is singular");
+  assert.match(line("en",3),/QA · 3 participants ·/);
+  assert.match(line("es",1),/QA · 1 participante ·/,"Spanish singular");
+  // Arabic picks the dual and the singular the same way every other surface does
+  assert.ok(line("ar",2).includes("\u0645\u0634\u0627\u0631\u0643\u0627\u0646"),"Arabic dual: "+line("ar",2));
+  assert.ok(line("ar",11).includes("11 \u0645\u0634\u0627\u0631\u0643\u0627"),"Arabic 11: "+line("ar",11));
+  assert.ok(line("ar",1).includes("\u0645\u0634\u0627\u0631\u0643 \u0648\u0627\u062d\u062f"),"Arabic one: "+line("ar",1));
+  // and no catalog spells the noun in the sentence any more
+  for(const locale of app.SUPPORTED_LOCALES){
+    assert.equal(app.I18N[locale]["importPreview.presetLine"],"{name} · {participants} · {plan}",locale);
+  }
+});
+
+test("a surface is written in one language, even when the two are set differently",()=>{
+  // The interface language and the prompt language are chosen separately. The
+  // transcript follows the interface; the prompt and the review packet follow the
+  // prompt language. A surface that reaches for the wrong one leaks the other
+  // language into it, which is exactly how the synthesis heading stayed English.
+  // Crossing the two languages makes any such leak visible as a script mismatch.
+  const ARABIC=/[\u0600-\u06ff]/;
+  const ps=[participant("p0","ChatGPT"),participant("p1","Claude")];
+  const turns=[
+    {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Claude", color:"#d97757",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:2,kind:"ballot"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  // the fixture keeps every piece of user content in Latin script, so any Arabic
+  // character in a German surface came from the catalog
+  const build=(ui,prompt)=>{
+    const st=stateFor(turns,ps,["Alpha answer","Beta answer","RANKING: B > A","Merged"]);
+    st.question="Which launch plan is best?"; st.recipe="ballot";
+    st.uiLocale=ui; st.promptLocale=prompt; st.cursor=3; st.ended=true;
+    st.ballots[2]=["B","A"];
+    return st;
+  };
+  // language names are given in their own script wherever they are reported, so
+  // they are not a leak
+  const stripNames=text=>{
+    let out=text;
+    for(const code of app.SUPPORTED_LOCALES) out=out.split(app.LOCALE_REGISTRY[code].label).join("");
+    return out;
+  };
+  const words=text=>String(text).toLocaleLowerCase("de").match(/\p{L}+/gu)||[];
+  const catalogWords=locale=>new Set(Object.values(app.I18N[locale]).flatMap(words));
+  const deWords=catalogWords("de"), arWords=catalogWords("ar"), enWords=catalogWords("en");
+  const germanOnly=new Set([...deWords].filter(word=>word.length>=3&&!arWords.has(word)&&!enWords.has(word)));
+  const germanLeaks=text=>[...new Set(words(stripNames(text)).filter(word=>germanOnly.has(word)))];
+  assert.ok(germanOnly.has("konfiguration"),"the derived set includes German catalog vocabulary outside a hand-picked list");
+  const before=app.getUiLocale();
+
+  app.setUiLocale("de"); app.setPromptLocale("ar"); app.setState(build("de","ar"));
+  assert.deepEqual(stripNames(app.transcriptMd()).match(ARABIC),null,
+    "a German transcript must carry no Arabic from the catalog");
+  const arPacket=app.reviewPacketMd("RPCROSS0001");
+  assert.deepEqual(germanLeaks(arPacket),[],
+    "an Arabic packet must carry no German from the catalog");
+  for(let i=0;i<turns.length;i++)
+    assert.deepEqual(germanLeaks(app.buildPrompt(i)),[],"prompt "+i+" must be Arabic only");
+
+  app.setUiLocale("ar"); app.setPromptLocale("de"); app.setState(build("ar","de"));
+  assert.deepEqual(stripNames(app.reviewPacketMd("RPCROSS0002")).match(ARABIC),null,
+    "a German packet must carry no Arabic from the catalog");
+  const arabicTranscript=stripNames(app.transcriptMd());
+  assert.deepEqual(germanLeaks(arabicTranscript),[],"an Arabic transcript must carry no German from the catalog");
+  assert.ok(ARABIC.test(arabicTranscript),"and the Arabic transcript is still Arabic");
+  for(let i=0;i<turns.length;i++)
+    assert.deepEqual(stripNames(app.buildPrompt(i)).match(ARABIC),null,"prompt "+i+" must be German only");
+
+  app.setUiLocale(before||"en"); app.setPromptLocale("en"); app.setState(null);
+});
+
+test("no internal name reaches a reader",()=>{
+  // Recipe keys, turn kinds and format keys are identifiers, not words. The
+  // synthesis heading reached readers as a stored English literal, so every
+  // generated surface is checked against the whole internal vocabulary.
+  const internal=[...new Set([
+    ...Object.keys(app.RECIPES),
+    ...Object.keys(app.I18N.en),
+    "markdown","plain","block","blind","debate","revise","ballot","synth",
+    "roleKey","nameKey","hintKey","promptLocale","uiLocale","formatVersion"
+  ])];
+  // The boundary has to be letter aware, or synth matches inside Synthese and
+  // ballot inside a translated word. A letter test written as a regex literal
+  // keeps its escapes, which the same class written inside a string would lose.
+  const isWordChar=c=>c!==undefined&&/[\p{L}\p{N}]/u.test(c);
+  const leaked=text=>{
+    const found=new Set();
+    for(const word of internal){
+      let at=text.indexOf(word);
+      while(at!==-1){
+        const before=text[at-1], after=text[at+word.length];
+        if(!isWordChar(before)&&!isWordChar(after)) found.add(word);
+        at=text.indexOf(word,at+Math.max(1,word.length));
+      }
+    }
+    return [...found];
+  };
+  for(const key of Object.keys(app.I18N.en)) assert.ok(internal.includes(key),key+" must be part of the internal-name guard");
+  // a token that a language uses as an ordinary word is vocabulary, not a key
+  const vocabulary=locale=>new Set(Object.values(app.I18N[locale])
+    .flatMap(value=>String(value).toLocaleLowerCase("de").match(/\p{L}+/gu)||[]));
+  const spoken={};
+  for(const locale of app.SUPPORTED_LOCALES) spoken[locale]=vocabulary(locale);
+  assert.equal(spoken.de.has("blind"),true,"German writes blind as a word");
+  assert.equal(spoken.en.has("ballot"),true,"English writes ballot as a word");
+  assert.equal(spoken.ar.has("packet.configuration"),false,"a dotted key is never a single word");
+  const leakedIn=(text,locale)=>leaked(text).filter(word=>!spoken[locale].has(word.toLocaleLowerCase("de")));
+  const ps=[participant("p0","ChatGPT"),participant("p1","Claude")];
+  const turns=[
+    {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Claude", color:"#d97757",role:"",round:1,kind:"debate"},
+    {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:2,kind:"revise"},
+    {pid:"p1",name:"Claude", color:"#d97757",role:"",round:2,kind:"ballot"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  const before=app.getUiLocale();
+  for(const locale of app.SUPPORTED_LOCALES){
+    const st=stateFor(turns,ps,["A","B","C","RANKING: B > A > C > D","D"]);
+    st.recipe="ballot"; st.uiLocale=locale; st.promptLocale=locale; st.cursor=4; st.ended=true;
+    app.setUiLocale(locale); app.setPromptLocale(locale); app.setState(st);
+    const surfaces={transcript:app.transcriptMd(),packet:app.reviewPacketMd("RPNAME00001")};
+    for(let i=0;i<turns.length;i++) surfaces["prompt"+i]=app.buildPrompt(i);
+    // the lane, the transcript list and the ballot box are rendered rather than
+    // written out, so the export checks never see them. The synthesis heading was
+    // exactly this shape of miss, on a surface no test was reading.
+    app.renderLane(); app.renderTranscript(); app.renderBallotBox();
+    const seen=[];
+    for(const id of ["lane","transcript","ballotBox","ballotHead","ballotRanks"]){
+      const root=document.getElementById(id);
+      for(const node of [root,...descendants(root)]){
+        if(node.textContent) seen.push(node.textContent);
+        for(const attribute of ["aria-label","title","placeholder"]){
+          const value=node.getAttribute&&node.getAttribute(attribute);
+          if(value) seen.push(value);
+        }
+      }
+    }
+    surfaces["rendered panels"]=seen.join("\n");
+    assert.ok(surfaces["rendered panels"].length>80,locale+": the panels rendered something to read");
+    for(const [name,text] of Object.entries(surfaces)){
+      // the quoting fences deliberately keep English keywords
+      const body=text.split(/\n/).filter(l=>!/\[(BEGIN|END) (QUOTED )?(ANSWER|REVIEW MATERIAL)/.test(l)).join("\n");
+      assert.deepEqual(leakedIn(body,locale),[],locale+" "+name+" carries an internal name");
+    }
+  }
+  app.setUiLocale(before||"en"); app.setPromptLocale("en"); app.setState(null);
+});
+
+test("a review packet names the synthesis turn in the language it is written in",()=>{
+  // A synthesis turn with no chatbot assigned carries the literal name the plan
+  // builder gave it. The transcript already replaced that with the catalog label,
+  // but the packet printed the stored name, so a German or Arabic packet carried
+  // an English heading. The packet is written in the prompt language, which is not
+  // always the interface language.
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  const s=stateFor(turns,ps,["one","two","merged"]);
+  s.cursor=2; s.ended=true;
+
+  for(const [prompt,expected] of [["de","Synthese"],["ar","\u0627\u0644\u062e\u0644\u0627\u0635\u0629"],["fr","Synth\u00e8se"]]){
+    s.promptLocale=prompt;
+    app.setState(s);
+    const packet=app.reviewPacketMd("RPSYNTH0001");
+    assert.ok(packet.includes(`### 3. ${expected}:`),prompt+" packet must use "+expected+" in the synthesis heading");
+    assert.doesNotMatch(packet,/### 3\. Synthesis:/,prompt+" packet must not carry the stored English name");
+  }
+
+  // the interface language does not decide it: the packet follows the prompt language
+  const before=app.getUiLocale();
+  app.setUiLocale("en");
+  s.promptLocale="ar";
+  app.setState(s);
+  assert.ok(app.reviewPacketMd("RPSYNTH0002").includes("### 3. \u0627\u0644\u062e\u0644\u0627\u0635\u0629:"),
+    "an English interface still writes an Arabic packet heading");
+  app.setUiLocale(before||"en");
+
+  // the transcript names it from the catalog as well, in the interface language
+  const uiBefore=app.getUiLocale();
+  s.promptLocale="en";
+  app.setState(s);
+  app.setUiLocale("de");
+  assert.match(app.transcriptMd(),/## Synthese:/,"the transcript heading is localized");
+  app.setUiLocale("ar");
+  assert.ok(app.transcriptMd().includes("\u0627\u0644\u062e\u0644\u0627\u0635\u0629"),"and in Arabic");
+  assert.doesNotMatch(app.transcriptMd(),/## Synthesis:/,"never the stored English name");
+  app.setUiLocale(uiBefore||"en");
+
+  // a synthesis turn that was assigned to a chatbot keeps that chatbot name
+  const named=stateFor([{pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:0,kind:"synth"}],ps,["merged"]);
+  named.promptLocale="ar"; named.cursor=0; named.ended=true;
+  app.setState(named);
+  const assigned=app.reviewPacketMd("RPSYNTH0003");
+  assert.ok(assigned.includes("### 1. Alpha:"),"an assigned synthesis keeps its chatbot name in the heading");
+  assert.equal(assigned.includes("### 1. \u0627\u0644\u062e\u0644\u0627\u0635\u0629:"),false,"and is not replaced by the catalog label");
+  app.setState(null);
+});
+
+test("no counted surface picks its own singular or plural",()=>{
+  // Three surfaces were fixed after each was found choosing between one and other
+  // by hand: the preset participant summary, the preset round summary, and the
+  // review packet ballot count. Each was invisible to a test that only exercised
+  // the selector. This holds the whole file to the rule instead.
+  const script=html.slice(scriptStart,scriptEnd);
+  // the catalogs legitimately spell every form, so set their lines aside
+  const code=script.split(/\r?\n/).filter(line=>!/^\s*"[a-zA-Z0-9_.]+":"/.test(line)).join("\n");
+
+  // the only place allowed to choose between the two forms by hand is the
+  // selector itself, where it is the documented fallback
+  const selector=code.slice(code.indexOf("function pluralSuffix"),code.indexOf("function countedMessage"));
+  assert.ok(selector.includes("pluralSuffix"),"the selector was located");
+  const outside=code.replace(selector,"").replace(/function pluralRuleFor[\s\S]*?\n}/,"");
+  assert.doesNotMatch(outside,/\?\s*"one"\s*:\s*"other"/,
+    "a surface is choosing its own singular or plural instead of asking the selector");
+
+  // and every counted family named in code goes through the shared helper
+  const FAMILIES=["common.answer","common.ballot","presets.participant","presets.round","score.point"];
+  for(const family of FAMILIES){
+    assert.equal(outside.includes(family+"."),false,
+      family+" is being addressed form by form outside the selector");
+  }
+  // the helper exists and every counted call site routes through it
+  assert.ok(code.includes("function countedMessage(locale,family,count)"),"the shared helper exists");
+  assert.ok(code.includes("function countLabel(kind,count){ return countedMessage("),"countLabel routes through it");
+  assert.ok(code.includes("function pointLabel(locale,points){ return countedMessage("),"pointLabel routes through it");
+  for(const site of ["presets.participant","presets.round","common.ballot"]){
+    const viaUi=code.includes('countedMessage(uiLocale,"'+site+'"');
+    const viaArg=code.includes('countedMessage(locale,"'+site+'"');
+    assert.ok(viaUi||viaArg,site+" must be counted through the helper");
+  }
+});
+
+test("the page still opens where platform plural support is missing or incomplete",()=>{
+  // Intl.PluralRules does not report failure for a language it lacks data for.
+  // It quietly answers for a different one. Trusting that answer would apply
+  // another language's count boundaries, and holding the catalog to it would
+  // refuse to start. A file that has to open anywhere offline must not die
+  // because a browser shipped without Arabic data.
+  const ANSWER_TWO="\u0625\u062c\u0627\u0628\u062a\u0627\u0646";
+  const runtimes={
+    "full data":Intl,
+    "no data for Arabic":{PluralRules:class{
+      resolvedOptions(){return {locale:"en",pluralCategories:["one","other"],type:"cardinal"};}
+      select(n){return n===1?"one":"other";}
+    }},
+    "no Intl at all":undefined,
+    "PluralRules throws":{PluralRules:class{constructor(){throw new RangeError("no plural data");}}},
+    "resolvedOptions throws":{PluralRules:class{resolvedOptions(){throw new Error("nope");} select(){return "other";}}},
+    "no category list":{PluralRules:class{
+      constructor(locale){this.locale=locale;}
+      resolvedOptions(){return {locale:this.locale,type:"cardinal"};}
+      select(){return "other";}
+    }},
+    "no selector":{PluralRules:class{
+      constructor(locale){this.locale=locale;}
+      resolvedOptions(){return {locale:this.locale,pluralCategories:["one","other"],type:"cardinal"};}
+    }},
+    "empty category list":{PluralRules:class{
+      constructor(locale){this.locale=locale;}
+      resolvedOptions(){return {locale:this.locale,pluralCategories:[],type:"cardinal"};}
+      select(){return "other";}
+    }}
+  };
+  for(const [label,impl] of Object.entries(runtimes)){
+    const booted=bootWith(impl);
+    assert.equal(booted.loaded,true,label+" must still open: "+(booted.error||""));
+    // and Arabic is still spelled correctly, because the rule travels with the file
+    assert.equal(booted.app.countedMessage("ar","common.answer",2),ANSWER_TWO,label);
+    assert.equal(booted.app.countedMessage("ar","common.answer",11),"11 \u0625\u062c\u0627\u0628\u0629",label);
+    assert.equal(booted.app.countedMessage("de","common.answer",2),"2 Antworten",label+": German is unaffected");
+    if(["no category list","no selector","empty category list"].includes(label))
+      assert.equal(booted.app.pluralRuleFor("qaa"),null,label+": incomplete platform data is refused");
+  }
+});
+
+test("the carried Arabic rule agrees with the platform everywhere the platform knows Arabic",()=>{
+  // The file carries the Arabic rule so it does not depend on the browser having
+  // the data. That is a second statement of the same rule, so it is pinned to the
+  // platform here and cannot drift unnoticed.
+  const platform=new Intl.PluralRules("ar");
+  assert.equal(platform.resolvedOptions().locale.split("-")[0],"ar","this runtime does know Arabic");
+  for(let n=0;n<=1000;n++){
+    assert.equal(app.BUILTIN_PLURAL.ar.select(n),platform.select(n),"n="+n);
+  }
+  assert.deepEqual(plain(app.BUILTIN_PLURAL.ar.categories).slice().sort(),
+    platform.resolvedOptions().pluralCategories.slice().sort());
+  // only Arabic needs one, because only Arabic distinguishes forms English lacks
+  assert.deepEqual(plain(Object.keys(app.BUILTIN_PLURAL)),["ar"]);
+});
+
+test("a language the platform cannot resolve is left alone rather than refused",()=>{
+  // A private use code no platform has data for. The rule lookup must decline it
+  // instead of accepting an answer meant for another language.
+  assert.equal(app.pluralRuleFor("qaa"),null,"no rule is invented for an unknown language");
+  assert.equal(app.pluralSuffix("qaa","common.answer",2),"other");
+  assert.equal(app.pluralSuffix("qaa","common.answer",1),"one");
+  // The set of languages is fixed once the file has loaded. The registry is
+  // frozen, and the script is not in strict mode, so a later registerLocale call
+  // reports nothing and changes nothing. An earlier version of this test tried to
+  // register a probe language here and read the silent no-op as proof that the
+  // validator had accepted it, which proved nothing at all.
+  assert.equal(Object.isFrozen(app.LOCALE_REGISTRY),true,"the registry is sealed after load");
+  const before=Object.keys(app.LOCALE_REGISTRY).sort();
+  app.registerLocale("qab","Probe",{...app.I18N.en});
+  assert.deepEqual(Object.keys(app.LOCALE_REGISTRY).sort(),before,"a later registration adds nothing");
+  assert.deepEqual(Array.from(app.SUPPORTED_LOCALES),["en","fr","es","de","ar"]);
+  // so every language that can ever be selected is one of the five validated at load
+  for(const code of app.SUPPORTED_LOCALES) assert.ok(app.LOCALE_REGISTRY[code],code);
+});
+
+test("a language spells counted nouns with the forms it actually distinguishes",()=>{
+  // Arabic distinguishes six count forms. English distinguishes two, so a
+  // catalog built on the English pair cannot spell the dual, and it cannot spell
+  // the form Arabic uses from 11 upward, where the counted noun goes back to the
+  // singular. Before this, an Arabic reader saw the plural everywhere:
+  //     2 answers   gave "2 \u0625\u062c\u0627\u0628\u0627\u062a"   where Arabic wants "\u0625\u062c\u0627\u0628\u062a\u0627\u0646"
+  //    11 answers   gave "11 \u0625\u062c\u0627\u0628\u0627\u062a"  where Arabic wants "11 \u0625\u062c\u0627\u0628\u0629"
+  const say=(locale,family,n)=>app.tr(locale,family+"."+app.pluralSuffix(locale,family,n),{count:n,points:n});
+  const expected={
+    0:"\u0644\u0627 \u0625\u062c\u0627\u0628\u0627\u062a",
+    1:"\u0625\u062c\u0627\u0628\u0629 \u0648\u0627\u062d\u062f\u0629",
+    2:"\u0625\u062c\u0627\u0628\u062a\u0627\u0646",
+    3:"3 \u0625\u062c\u0627\u0628\u0627\u062a",
+    10:"10 \u0625\u062c\u0627\u0628\u0627\u062a",
+    11:"11 \u0625\u062c\u0627\u0628\u0629",
+    26:"26 \u0625\u062c\u0627\u0628\u0629",
+    100:"100 \u0625\u062c\u0627\u0628\u0629"
+  };
+  for(const [n,text] of Object.entries(expected)) assert.equal(say("ar","common.answer",Number(n)),text,"ar n="+n);
+  // the category actually chosen, so a wrong catalog cannot pass by coincidence
+  assert.equal(app.pluralSuffix("ar","common.answer",2),"two");
+  assert.equal(app.pluralSuffix("ar","common.answer",5),"few");
+  assert.equal(app.pluralSuffix("ar","common.answer",11),"many");
+  assert.equal(app.pluralSuffix("ar","common.answer",0),"zero");
+
+  // the four languages reviewed before this keep the two-form behaviour exactly
+  for(const locale of ["en","fr","es","de"]){
+    for(const family of ["common.answer","common.ballot","presets.participant","presets.round","score.point"]){
+      for(const n of [0,1,2,3,11,26,100]){
+        assert.equal(app.pluralSuffix(locale,family,n),n===1?"one":"other",locale+" "+family+" n="+n);
+      }
+    }
+  }
+  // a family a language has not extended still falls back to the pair
+  assert.equal(app.pluralSuffix("de","common.answer",2),"other");
+  // an unknown language cannot throw
+  assert.equal(app.pluralSuffix("zz","common.answer",2),"other");
+
+  // the interface path itself, which is what a reader actually sees
+  const before=app.getUiLocale();
+  app.setUiLocale("ar");
+  assert.equal(app.countLabel("answer",2),"\u0625\u062c\u0627\u0628\u062a\u0627\u0646","the dual reaches the interface");
+  assert.equal(app.countLabel("answer",11),"11 \u0625\u062c\u0627\u0628\u0629");
+  assert.equal(app.countLabel("ballot",2),"\u062a\u0635\u0648\u064a\u062a\u0627\u0646");
+  assert.equal(app.countLabel("ballot",11),"11 \u062a\u0635\u0648\u064a\u062a\u0627");
+  app.setUiLocale("de");
+  assert.equal(app.countLabel("answer",2),"2 Antworten","German is untouched");
+  assert.equal(app.countLabel("answer",1),"1 Antwort");
+  app.setUiLocale(before||"en");
+
+  // a catalog declares either none of the extra forms or exactly the ones its
+  // language distinguishes, so no count can land on a form it does not have
+  const FAMILIES=["common.answer","common.ballot","presets.participant","presets.round","score.point"];
+  const OPTIONAL=["zero","two","few","many"];
+  for(const locale of app.SUPPORTED_LOCALES){
+    const wanted=new Intl.PluralRules(locale).resolvedOptions().pluralCategories.filter(c=>OPTIONAL.includes(c)).sort();
+    const extended=FAMILIES.some(family=>OPTIONAL.some(c=>app.I18N[locale][family+"."+c]!==undefined));
+    for(const family of FAMILIES){
+      const declared=OPTIONAL.filter(c=>app.I18N[locale][family+"."+c]!==undefined).sort();
+      if(extended) assert.deepEqual(declared,wanted,locale+" "+family);
+      else assert.deepEqual(declared,[],locale+" does not partly opt in through "+family);
+    }
+  }
+  assert.deepEqual(OPTIONAL.filter(c=>app.I18N.ar["common.answer."+c]!==undefined).sort(),
+    ["few","many","two","zero"],"Arabic declares all four");
+  assert.deepEqual(OPTIONAL.filter(c=>app.I18N.de["common.answer."+c]!==undefined),[],"German declares none");
+
+  // and the labels the interface builds go through the same rule
+  assert.equal(app.pointLabel("ar",3),app.tr("ar","score.point.few",{points:3}));
+  assert.equal(app.pointLabel("ar",2),"نقطتان","the Arabic dual is used for two points");
+  assert.equal(app.pointLabel("ar",11),app.tr("ar","score.point.many",{points:11}));
+  assert.equal(app.pointLabel("fr",1),"1 pt");
+  assert.equal(app.pointLabel("fr",0),"0 pts","French keeps the form it was reviewed with");
+
+  // Every product surface must use the selector, not only the two helpers above.
+  storage.clear();
+  app.Store.savePresets([samplePreset({name:"Arabic dual",rounds:2})]);
+  app.setUiLocale("ar",false);
+  app.renderPresets(0);
+  const summaryText=descendants(document.getElementById("presetSummary")).map(node=>node.textContent).join(" ");
+  assert.match(summaryText,/مشاركان/,"the preset summary uses the participant dual");
+  assert.match(summaryText,/جولتان/,"the preset summary uses the round dual");
+
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"ballot"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:2,kind:"ballot"}
+  ];
+  const s=stateFor(turns,ps,["one","two","الترتيب: B > A","الترتيب: A > B"]);
+  s.promptLocale="ar"; s.ballots[2]=["B","A"]; s.ballots[3]=["A","B"];
+  app.setState(s);
+  const arPacket=app.reviewPacketMd("RPPLURAL123");
+  assert.match(arPacket,/التصويتات المحتسبة: تصويتان/,
+    "the review packet keeps the ballot dual in a standalone nominative phrase");
+  const twoAnswers=app.countLabel("answer",2);
+  assert.equal(app.tr("ar","done.withSynth",{answers:twoAnswers}),
+    "لديك الآن إجابتان وخلاصة محفوظة. يمكنك تنزيل السجل أو المتابعة.");
+  assert.equal(app.tr("ar","done.withoutSynth",{answers:twoAnswers}),
+    "لديك الآن إجابتان في السجل. يمكنك تنزيله أو المتابعة.");
+  const arRecovery=app.tr("ar","recovery.message",{
+    reason:app.tr("ar","recovery.reason.restart"),when:"12:00",answers:twoAnswers,question:"سؤال"
+  });
+  assert.match(arRecovery,/قبل أن تبدأ تمريرا جديدا/,
+    "the recovery reason follows before an with a present verb");
+  assert.match(arRecovery,/فيها إجابتان/,
+    "the recovery sentence keeps the shared dual in a nominative position");
+  assert.doesNotMatch(arRecovery,/قبل أن (بدأت|تجاهلت|فتحت)|على إجابتان|تم حفظ إجابتان/);
+  app.setState(null);
+  storage.clear();
+  app.setUiLocale(before||"en",false);
 });
 
 test("registered language packs have identical keys and placeholders",()=>{
   const enKeys=Object.keys(app.I18N.en).sort();
   const placeholders=value=>Array.from(String(value).matchAll(/\{([A-Za-z0-9_]+)\}/g),m=>m[1]).sort();
+  assert.equal(enKeys.length,434,"the documented complete catalog size stays exact");
   assert.equal("confirm.import" in app.I18N.en,false);
-  assert.deepEqual(Array.from(app.SUPPORTED_LOCALES),["en","fr","es"]);
+  assert.deepEqual(Array.from(app.SUPPORTED_LOCALES),["en","fr","es","de","ar"]);
+  // A language may add the count forms English does not distinguish. Everything
+  // else still has to match English exactly, key for key and placeholder for
+  // placeholder.
+  const FAMILIES=["common.answer","common.ballot","presets.participant","presets.round","score.point"];
+  const OPTIONAL=["zero","two","few","many"];
+  const isOptional=key=>FAMILIES.some(f=>OPTIONAL.some(c=>key===f+"."+c));
+  assert.equal(enKeys.some(isOptional),false,"English declares only the pair it distinguishes");
   for(const locale of app.SUPPORTED_LOCALES){
-    assert.deepEqual(Object.keys(app.I18N[locale]).sort(),enKeys,locale);
+    const keys=Object.keys(app.I18N[locale]);
+    assert.deepEqual(keys.filter(k=>!isOptional(k)).sort(),enKeys,locale);
     for(const key of enKeys) assert.deepEqual(placeholders(app.I18N[locale][key]),placeholders(app.I18N.en[key]),`${locale}: ${key}`);
+    for(const key of keys.filter(isOptional)){
+      const family=key.slice(0,key.lastIndexOf("."));
+      const shape=placeholders(app.I18N[locale][key]);
+      if(shape.length) assert.deepEqual(shape,placeholders(app.I18N.en[family+".other"]),`${locale}: ${key}`);
+    }
   }
+  assert.equal(app.I18N.de["format.markdown.directive"].includes("auf die gerenderte Darstellung"),true,
+    "the reviewed German directive keeps its required article");
+  assert.equal(app.I18N.de["recovery.restoreAria"],"Gespeichertes Relay wiederherstellen");
+  assert.equal(app.I18N.de["recovery.removeAria"],"Gespeicherte Wiederherstellungskopie entfernen");
+  assert.equal(app.I18N.ar["recovery.reason.restart"],"تبدأ تمريرا جديدا");
+  assert.equal(app.I18N.ar["recovery.reason.discard"],"تتجاهل تمريرا محفوظا");
+  assert.equal(app.I18N.ar["recovery.reason.replace"],"تفتح جلسة أخرى");
+  for(const key of ["format.markdown.hint","format.markdown.directive","format.block.name","format.block.hint","format.block.directive"]){
+    assert.equal(/كتلة رمز|كتل الرمز|أمثلة الرمز/.test(app.I18N.ar[key]),false,
+      key+" uses reviewed Arabic code terminology");
+  }
+  // Once a locale opts in, every counted family must be complete. Omitting all
+  // optional forms from one family is still a partial catalog, not an opt-out.
+  const incompleteArabic={...app.I18N.ar};
+  for(const category of OPTIONAL) delete incompleteArabic["common.ballot."+category];
+  assert.throws(()=>app.registerLocale("ars","Arabic validation probe",incompleteArabic,"rtl"),
+    /must declare .* for common\.ballot/);
 });
 
 test("every declarative UI translation key exists in every registered catalog",()=>{
@@ -266,6 +870,54 @@ test("Spanish prompt generation covers every turn kind and preserves user conten
   assert.match(prompts[4],/USER-CONTENT-ONE/);
 });
 
+test("German prompt generation covers every turn kind and preserves user content verbatim",()=>{
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"debate"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"revise"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"Prüfer",round:2,kind:"ballot"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  const s=stateFor(turns,ps,["USER-CONTENT-ONE","USER-CONTENT-TWO","USER-CONTENT-THREE","RANGLISTE: B > A",""]);
+  s.question="QUESTION-VERBATIM {do-not-touch}";s.promptLocale="de";s.ballots[3]=["B","A"];
+  app.setState(s);
+  const prompts=turns.map((_,i)=>app.buildPrompt(i));
+  assert.match(prompts[0],/Beantworte die folgende Frage/);
+  assert.match(prompts[1],/BISHERIGE DISKUSSION/);
+  assert.match(prompts[2],/DEINE FRÜHERE ANTWORT/);
+  assert.match(prompts[3],/Ordne ALLE Antworten/);
+  assert.match(prompts[3],/RANGLISTE: A > B/);
+  assert.doesNotMatch(prompts[3],/RANKING:|CLASSEMENT|CLASIFICACIÓN/);
+  assert.match(prompts[4],/Führe sie zu einer starken Antwort zusammen/);
+  for(const value of prompts){assert.match(value,/QUESTION-VERBATIM \{do-not-touch\}/);assert.doesNotMatch(value,/\[[A-Za-z0-9_.-]+\]/);}
+  assert.match(prompts[4],/USER-CONTENT-ONE/);
+});
+
+test("Arabic prompt generation covers every turn kind and preserves user content verbatim",()=>{
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"debate"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"revise"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"مراجع",round:2,kind:"ballot"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  const s=stateFor(turns,ps,["USER-CONTENT-ONE","USER-CONTENT-TWO","USER-CONTENT-THREE","الترتيب: B > A",""]);
+  s.question="QUESTION-VERBATIM {do-not-touch}";s.promptLocale="ar";s.ballots[3]=["B","A"];
+  app.setState(s);
+  const prompts=turns.map((_,i)=>app.buildPrompt(i));
+  assert.match(prompts[0],/أجب عن السؤال التالي/);
+  assert.match(prompts[1],/النقاش حتى الآن/);
+  assert.match(prompts[2],/إجابتك السابقة/);
+  assert.match(prompts[3],/رتب جميع الإجابات/);
+  assert.match(prompts[3],/الترتيب: A > B/);
+  assert.doesNotMatch(prompts[3],/RANKING:|CLASSEMENT|CLASIFICACIÓN|RANGLISTE/);
+  assert.match(prompts[4],/ادمجها في إجابة قوية واحدة/);
+  for(const value of prompts){assert.match(value,/QUESTION-VERBATIM \{do-not-touch\}/);assert.doesNotMatch(value,/\[[A-Za-z0-9_.-]+\]/);}
+  assert.match(prompts[4],/USER-CONTENT-ONE/);
+});
+
 test("quoted-answer framing neutralizes attempts to reproduce the session marker",()=>{
   const ps=[participant("p0","Alpha"),participant("p1","Beta")];
   const turns=[
@@ -287,12 +939,47 @@ test("interface and prompt language preferences remain independent with English 
   assert.equal(app.Store.loadPrefs().uiLocale,"fr");
   assert.equal(app.Store.loadPrefs().promptLocale,"en");
   assert.equal(app.tr("es","question.heading"),"La pregunta");
-  assert.equal(app.tr("de","question.heading"),"The question");
+  assert.equal(app.tr("de","question.heading"),"Die Frage");
+  assert.equal(app.tr("ar","question.heading"),"السؤال");
+  assert.equal(app.tr("it","question.heading"),"The question");
   assert.equal(app.tr("fr","score.point.one",{points:1}),"1 pt");
   assert.equal(app.tr("fr","score.point.other",{points:0}),"0 pts");
   assert.match(app.tr("fr","ballot.none"),/CLASSEMENT : B > A > C/);
   assert.match(app.tr("es","ballot.none"),/CLASIFICACIÓN: B > A > C/);
+  assert.match(app.tr("de","ballot.none"),/RANGLISTE: B > A > C/);
+  assert.match(app.tr("ar","ballot.none"),/الترتيب: B > A > C/);
   app.setUiLocale("en");
+});
+
+test("interface direction follows the interface locale without changing prompt language",()=>{
+  app.setState(null);app.setPromptLocale("de",false);app.setUiLocale("ar",false);
+  assert.equal(app.LOCALE_REGISTRY.de.direction,"ltr");
+  assert.equal(app.LOCALE_REGISTRY.ar.direction,"rtl");
+  assert.equal(document.documentElement.lang,"ar");
+  assert.equal(document.documentElement.dir,"rtl");
+  assert.equal(app.getPromptLocale(),"de");
+  app.setUiLocale("de",false);
+  assert.equal(document.documentElement.lang,"de");
+  assert.equal(document.documentElement.dir,"ltr");
+  assert.equal(app.getPromptLocale(),"de");
+  app.setUiLocale("en",false);app.setPromptLocale("en",false);
+});
+
+test("right-to-left layout uses logical edges while user text chooses its own direction",()=>{
+  assert.match(html,/html\[dir="rtl"\] \.lane\{direction:ltr\}/);
+  assert.match(html,/html\[dir="rtl"\] \.station\{direction:rtl\}/);
+  assert.match(html,/border-inline-start:3px solid/);
+  assert.match(html,/borderInlineStartColor=safeColor/);
+  assert.match(html,/id="runQuestion" dir="auto"/);
+  for(const id of ["question","promptBox","answer","transcriptFilterQuery"]){
+    assert.match(html,new RegExp(`id=["']${id}["'][^>]*dir=["']auto["']|dir=["']auto["'][^>]*id=["']${id}["']`),id);
+  }
+  assert.match(html,/nm\.dir="auto"/);
+  assert.match(html,/role\.dir="auto"/);
+  assert.match(html,/url\.dir="ltr"/);
+  assert.match(html,/body\.dir="auto"/);
+  assert.match(html,/ta\.dir="auto"/);
+  assert.match(html,/html\[dir="rtl"\] textarea\[dir="auto"\]:placeholder-shown,html\[dir="rtl"\] input\[dir="auto"\]:placeholder-shown\{direction:rtl\}/);
 });
 
 test("automatic role suggestions remain adaptable while legacy explicit roles stay locked",()=>{
@@ -752,10 +1439,10 @@ test("selected preset inspection is localized and treats invalid storage as untr
 test("export filenames are dated, private, portable, and visibly confirmed",()=>{
   const stamp=new Date(2026,7,29,23,45,0);
   assert.equal(app.exportDateStamp(stamp),"2026-08-29");
-  assert.equal(app.exportFilename("preset","json","Décision: <Team>/A",stamp),"relay-preset-decision-team-a-2026-08-29-v2.4.0.json");
-  assert.equal(app.exportFilename("transcript","md","",stamp),"relay-transcript-2026-08-29-v2.4.0.md");
+  assert.equal(app.exportFilename("preset","json","Décision: <Team>/A",stamp),"relay-preset-decision-team-a-2026-08-29-v2.5.0.json");
+  assert.equal(app.exportFilename("transcript","md","",stamp),"relay-transcript-2026-08-29-v2.5.0.md");
   assert.doesNotMatch(app.exportFilename("session","json","PRIVATE QUESTION",stamp),/[<>:\\/?*]/);
-  const filename="relay-session-2026-08-29-v2.4.0.json";
+  const filename="relay-session-2026-08-29-v2.5.0.json";
   app.showExportStatus(filename);
   const status=document.getElementById("exportStatus");
   assert.equal(status.classList.contains("hidden"),false);
@@ -780,9 +1467,9 @@ test("relay download controls use the filename helper and do not mutate the sess
     document.getElementById("reviewPacketBtn").onclick();
   }finally{document.createElement=originalCreate;}
   assert.equal(JSON.stringify(s),before);
-  assert.match(requested[0],/^relay-transcript-\d{4}-\d{2}-\d{2}-v2\.4\.0\.md$/);
-  assert.match(requested[1],/^relay-session-\d{4}-\d{2}-\d{2}-v2\.4\.0\.json$/);
-  assert.match(requested[2],/^relay-review-packet-\d{4}-\d{2}-\d{2}-v2\.4\.0\.md$/);
+  assert.match(requested[0],/^relay-transcript-\d{4}-\d{2}-\d{2}-v2\.5\.0\.md$/);
+  assert.match(requested[1],/^relay-session-\d{4}-\d{2}-\d{2}-v2\.5\.0\.json$/);
+  assert.match(requested[2],/^relay-review-packet-\d{4}-\d{2}-\d{2}-v2\.5\.0\.md$/);
   assert.match(document.getElementById("exportStatus").textContent,new RegExp(requested[2].replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
@@ -804,7 +1491,7 @@ test("selected preset export contains one validated preset and leaves the librar
   const bundle=JSON.parse(await blob.text());
   assert.equal(JSON.stringify(app.Store.loadPresets()),before);
   assert.deepEqual(bundle.presets.map(p=>p.name),["Décision équipe"]);
-  assert.match(requested,/^relay-preset-decision-equipe-\d{4}-\d{2}-\d{2}-v2\.4\.0\.json$/);
+  assert.match(requested,/^relay-preset-decision-equipe-\d{4}-\d{2}-\d{2}-v2\.5\.0\.json$/);
   assert.match(document.getElementById("presetStatus").textContent,new RegExp(requested.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
@@ -812,7 +1499,7 @@ test("portable preset export has a versioned privacy-safe envelope",()=>{
   const bundle=plain(app.exportPresetBundle([samplePreset({question:"DO NOT EXPORT",answers:["SECRET"],unknown:"drop"})]));
   assert.equal(bundle.kind,"relay-console-presets");
   assert.equal(bundle.formatVersion,1);
-  assert.equal(bundle.app,"2.4.0");
+  assert.equal(bundle.app,"2.5.0");
   assert.equal(bundle.presets.length,1);
   assert.equal("question" in bundle.presets[0],false);
   assert.equal("answers" in bundle.presets[0],false);
@@ -862,7 +1549,7 @@ test("bulk preset export preserves a valid 50-entry file and reports every extra
   try{document.getElementById("presetExport").onclick();}
   finally{document.createElement=originalCreate;sandbox.URL.createObjectURL=originalCreateUrl;}
   const downloaded=JSON.parse(await blob.text());
-  assert.match(requested,/^relay-presets-\d{4}-\d{2}-\d{2}-v2\.4\.0\.json$/);
+  assert.match(requested,/^relay-presets-\d{4}-\d{2}-\d{2}-v2\.5\.0\.json$/);
   assert.equal(downloaded.presets.length,50);
   assert.deepEqual(downloaded.presets.map(p=>p.name),valid.slice(0,50).map(p=>p.name));
   assert.match(document.getElementById("presetStatus").textContent,/P51/);
@@ -1076,6 +1763,8 @@ test("session language metadata is preserved and older sessions default prompts 
   assert.equal(app.validateSession(base).promptLocale,"en");
   assert.equal(app.validateSession({...base,promptLocale:"fr",uiLocale:"fr"}).promptLocale,"fr");
   assert.equal(app.validateSession({...base,promptLocale:"es",uiLocale:"es"}).promptLocale,"es");
+  assert.equal(app.validateSession({...base,promptLocale:"de",uiLocale:"de"}).promptLocale,"de");
+  assert.equal(app.validateSession({...base,promptLocale:"ar",uiLocale:"ar"}).promptLocale,"ar");
 });
 
 test("French transcript export localizes app labels without changing captured answers",()=>{
@@ -1098,6 +1787,30 @@ test("Spanish transcript export localizes app labels without changing captured a
   const md=app.transcriptMd();
   assert.match(md,/# Transcripción del relevo/);
   assert.match(md,/\*\*Pregunta:\*\* QUESTION-RAW/);
+  assert.match(md,/CAPTURED-VERBATIM/);
+  app.setState(null);app.setUiLocale("en");
+});
+
+test("German transcript export localizes app labels without changing captured answers",()=>{
+  app.setState(null);app.setUiLocale("de");
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[{pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},{pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"blind"}];
+  const s=stateFor(turns,ps,["CAPTURED-VERBATIM",""]);s.question="QUESTION-RAW";s.uiLocale="de";app.setState(s);
+  const md=app.transcriptMd();
+  assert.match(md,/# Relay-Transkript/);
+  assert.match(md,/\*\*Frage:\*\* QUESTION-RAW/);
+  assert.match(md,/CAPTURED-VERBATIM/);
+  app.setState(null);app.setUiLocale("en");
+});
+
+test("Arabic transcript export localizes app labels without changing captured answers",()=>{
+  app.setState(null);app.setUiLocale("ar");
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[{pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},{pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"blind"}];
+  const s=stateFor(turns,ps,["CAPTURED-VERBATIM",""]);s.question="QUESTION-RAW";s.uiLocale="ar";app.setState(s);
+  const md=app.transcriptMd();
+  assert.match(md,/# سجل التمرير/);
+  assert.match(md,/\*\*السؤال:\*\* QUESTION-RAW/);
   assert.match(md,/CAPTURED-VERBATIM/);
   app.setState(null);app.setUiLocale("en");
 });
@@ -1496,7 +2209,7 @@ test("storage reporting accounts for the recovery slot and offers actionable gui
   storage.clear();app.renderStorageReport();
 });
 
-test("recovery and storage copy is complete and honest in all three languages",()=>{
+test("recovery and storage copy is complete and honest in all five languages",()=>{
   const keys=["recovery.restore","recovery.remove","recovery.message","recovery.expiry","recovery.noQuestion",
     "recovery.reason.restart","recovery.reason.discard","recovery.reason.replace",
     "save.ok","save.failed","storage.total","storage.quota","storage.unavailable",
@@ -1510,11 +2223,13 @@ test("recovery and storage copy is complete and honest in all three languages",(
       assert.doesNotMatch(value,/\u2014/,locale+" "+key);
     }
     // the privacy footer must state the seven day window in every language
-    assert.match(app.I18N[locale]["footer.privacy"],/7|sept|siete|seven/i,locale);
+    assert.match(app.I18N[locale]["footer.privacy"],/7|sept|siete|seven|sieben|سبعة/i,locale);
   }
   assert.match(app.I18N.en["footer.privacy"],/up to seven days/);
   assert.match(app.I18N.fr["footer.privacy"],/sept jours/);
   assert.match(app.I18N.es["footer.privacy"],/siete d\u00edas/);
+  assert.match(app.I18N.de["footer.privacy"],/sieben Tage/);
+  assert.match(app.I18N.ar["footer.privacy"],/سبعة أيام/);
   assert.doesNotMatch(app.I18N.en["confirm.discardSession"],/permanent|cannot be undone/i);
   assert.match(app.I18N.en["confirm.discardSession"],/seven days/i);
   app.setUiLocale("fr",false);
@@ -1924,13 +2639,13 @@ test("export filenames stay portable at the truncation boundary and for unusable
 test("a newer download confirmation is never cleared by an older timer",()=>{
   sandbox.__timers.length=0;
   const status=document.getElementById("exportStatus");
-  app.showExportStatus("relay-transcript-2026-08-29-v2.4.0.md");
+  app.showExportStatus("relay-transcript-2026-08-29-v2.5.0.md");
   assert.match(status.textContent,/relay-transcript-2026-08-29/);
   assert.equal(status.classList.contains("hidden"),false);
   const first=sandbox.__timers.filter(timer=>timer.delay===6000);
   assert.equal(first.length,1,"a confirmation schedules exactly one clear");
 
-  app.showExportStatus("relay-session-2026-08-29-v2.4.0.json");
+  app.showExportStatus("relay-session-2026-08-29-v2.5.0.json");
   assert.match(status.textContent,/relay-session-2026-08-29/);
   first[0].callback();                                  // the stale timer must not fire
   assert.match(status.textContent,/relay-session-2026-08-29/,"an older timer must not clear a newer confirmation");
@@ -2180,6 +2895,46 @@ test("the keyboard reference opens, is announced, and gives focus back",()=>{
   assert.doesNotMatch(app.I18N.en["shortcuts.note"],/Every shortcut uses a modifier/);
 });
 
+test("the lane connector follows the lane, not the direction of its label",()=>{
+  // The lane is pinned left to right in every language so progress always reads as
+  // a timeline. Each station then restores right to left so its Arabic label reads
+  // correctly, and the connector, which lives inside the station, inherited that
+  // flip. Because the connector is placed with inset-inline-start, every segment
+  // was drawn one station the wrong way in Arabic: the first hung off the edge of
+  // the page and the segment before the last station was missing entirely. The lit
+  // segments carry progress, so the completed run was shown against the wrong pair.
+  const bar=html.match(/\.station \.bar\{([^}]*)\}/);
+  assert.ok(bar,"the connector must have its own rule");
+  assert.match(bar[1],/inset-inline-start:50%/,"the connector is placed on the inline axis");
+  assert.match(html,/html\[dir="rtl"\] \.lane\{direction:ltr\}/,"the lane stays a left to right timeline");
+  assert.match(html,/html\[dir="rtl"\] \.station\{direction:rtl\}/,"the station label reads right to left");
+  // the override that keeps the two from disagreeing
+  assert.match(html,/html\[dir="rtl"\] \.station \.bar\{direction:ltr\}/,
+    "the connector must be pinned back to the lane direction");
+  // and it has to win, so it must come after the rule that flips the station
+  const flip=html.indexOf('html[dir="rtl"] .station{direction:rtl}');
+  const pin=html.indexOf('html[dir="rtl"] .station .bar{direction:ltr}');
+  assert.ok(flip>=0&&pin>flip,"the override follows the rule it corrects");
+  // the connector is decoration only, so pinning its direction changes nothing read aloud
+  assert.match(html,/bar\.setAttribute\("aria-hidden","true"\)/,"the connector stays hidden from assistive technology");
+});
+
+test("round labels stay centered on the fixed lane timeline in Arabic",()=>{
+  // The label is inside a station whose direction becomes RTL for Arabic. Logical
+  // inline-start positioning therefore moves its origin to the right, while the
+  // existing negative X translation still moves left. In a live browser this put
+  // every Arabic round label 62.34 pixels left of its station center, even though
+  // the same labels were centered within 0.001 pixels in English. Lane geometry is
+  // deliberately fixed left to right, so the label needs a physical center while
+  // its own Arabic text keeps the inherited reading direction.
+  const lap=html.match(/\.lap\{([^}]*)\}/);
+  assert.ok(lap,"round labels must have their own rule");
+  assert.match(lap[1],/(?:^|;)left:50%(?:;|$)/,"the label uses the lane's physical center");
+  assert.doesNotMatch(lap[1],/inset-inline-start/,'logical start must not inherit the Arabic station direction');
+  assert.match(lap[1],/transform:translateX\(-50%\)/,"the label centers its own width around the station center");
+  assert.match(html,/lap\.setAttribute\("aria-hidden","true"\)/,"the visual label remains excluded from the station's accessible name");
+});
+
 test("every pointer target meets the minimum size",()=>{
   // The roster reorder arrows were 19.6 by 18.6 CSS pixels and sit directly above
   // one another, so the spacing exception did not apply.
@@ -2187,6 +2942,12 @@ test("every pointer target meets the minimum size",()=>{
   assert.ok(rule,"the reorder arrows must have their own rule");
   assert.match(rule[1],/min-width:24px/);
   assert.match(rule[1],/min-height:24px/);
+  // Link-style actions are standalone buttons, including transcript curation
+  // and coach dismissal. They previously rendered at 72 by 16 CSS pixels.
+  const linkRule=html.match(/\.linkbtn\{([^}]*)\}/);
+  assert.ok(linkRule,"link-style buttons must have their own rule");
+  assert.match(linkRule[1],/min-width:24px/);
+  assert.match(linkRule[1],/min-height:24px/);
   // the closing checkbox is small but its label is the target, so it is exempt
   assert.match(html,/<label class="check" id="closingWrap"><input type="checkbox" id="closing">/);
 });
@@ -2233,6 +2994,261 @@ test("a station click is routed by how it was produced, not by which handler ran
 
   assert.equal(JSON.stringify(app.getState().answers),captured,"no route may alter a captured answer");
   app.setState(null);storage.clear();
+});
+
+test("a ballot line survives the invisible direction marks that right-to-left replies carry",()=>{
+  // An assistant writing Arabic around Latin letters routinely emits U+200F, the
+  // Arabic letter mark, or an embedding, so the mixed line displays correctly.
+  // Those characters survive copy and paste and are invisible on screen, so a
+  // ranking that looks exactly right was silently refused with nothing for the
+  // reader to see. The marks are stripped for comparison only.
+  const labels=["A","B","C"];
+  const expected=["B","A","C"];
+  const marked={
+    "leading right-to-left mark":"\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C",
+    "leading left-to-right mark":"\u200e\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C",
+    "Arabic letter mark":"\u061c\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C",
+    "mark after the colon":"\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u200fB > A > C",
+    "marks between the letters":"\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B\u200f > \u200fA > C",
+    "wrapped in an embedding":"\u202b\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C\u202c",
+    "wrapped in an isolate":"\u2067\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A > C\u2069"
+  };
+  for(const [label,line] of Object.entries(marked)){
+    assert.deepEqual(plain(app.parseBallot(line,labels)),expected,label+" must still parse");
+  }
+  // the same marks must not rescue a line that is genuinely wrong
+  assert.equal(app.parseBallot("\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > B > C",labels),null,"a repeated label is still rejected");
+  assert.equal(app.parseBallot("\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A",labels),null,"a partial ranking is still rejected");
+  assert.equal(app.parseBallot("\u200f\u0631\u062a\u0628\u062a\u0647\u0627 \u0643\u0627\u0644\u062a\u0627\u0644\u064a B > A > C",labels),null,"prose is still rejected");
+
+  // the Arabic comma is the natural list separator in Arabic prose, exactly as
+  // the plain comma already was for the other languages
+  assert.deepEqual(plain(app.parseBallot("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B\u060c A\u060c C",labels)),expected);
+  assert.deepEqual(plain(app.parseBallot("RANKING: B, A, C",labels)),expected,"the plain comma still works");
+
+  // every language still parses its own marker unchanged
+  const markers={en:"RANKING",fr:"CLASSEMENT",es:"CLASIFICACION",de:"RANGLISTE",ar:"\u0627\u0644\u062a\u0631\u062a\u064a\u0628"};
+  for(const [locale,marker] of Object.entries(markers)){
+    assert.deepEqual(plain(app.parseBallot(marker+": B > A > C",labels)),expected,locale);
+  }
+  assert.deepEqual(plain(app.parseBallot("CLASIFICACI\u00d3N: B > A > C",labels)),expected,"accented Spanish");
+
+  // the helper itself removes only invisible formatting, never content
+  assert.equal(app.stripBidiMarks("\u200fB\u200e>\u061cA\u202b\u202c\u2066\u2069"),"B>A");
+  assert.equal(app.stripBidiMarks("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A"),"\u0627\u0644\u062a\u0631\u062a\u064a\u0628: B > A","Arabic letters are untouched");
+  assert.equal(app.stripBidiMarks("caf\u00e9 na\u00efve stra\u00dfe"),"caf\u00e9 na\u00efve stra\u00dfe","accents and eszett are untouched");
+});
+
+test("a ballot refuses direction overrides that can disguise the visible ranking order",()=>{
+  const labels=["A","B","C"];
+  // LRO and RLO can force characters to display in an order that disagrees with
+  // their stored order. Removing either control and counting the remaining text
+  // would therefore risk recording a different vote from the one the user sees.
+  // Embeddings and isolates do not override the strong Latin label directions and
+  // remain accepted by the compatibility test above.
+  for(const line of [
+    "\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u202dB > A > C\u202c",
+    "\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u202eB > A > C\u202c",
+    "RANKING: \u202dB > A > C\u202c",
+    "RANKING: \u202eB > A > C\u202c"
+  ]) assert.equal(app.parseBallot(line,labels),null,"an override makes the ballot ambiguous");
+  assert.deepEqual(plain(app.parseBallot("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u202bB > A > C\u202c",labels)),["B","A","C"],"a regular embedding remains compatible");
+  assert.deepEqual(plain(app.parseBallot("\u0627\u0644\u062a\u0631\u062a\u064a\u0628: \u2067B > A > C\u2069",labels)),["B","A","C"],"a regular isolate remains compatible");
+});
+
+test("an override is refused only on the line it can actually reorder",()=>{
+  // An unclosed override ends at the end of its paragraph, and a newline is a
+  // paragraph break, so an override in earlier prose cannot reach the ranking
+  // line. Measured in a browser at 14px monospace inside a dir="rtl" block, by
+  // reading the position of each label glyph:
+  //   override on the ranking line      stored B A C   reads C A B   ambiguous
+  //   override in an earlier paragraph  stored B A C   reads B A C   unambiguous
+  //   override closed before the line   stored B A C   reads B A C   unambiguous
+  // Refusing the whole reply therefore rejected ballots that no reader could
+  // have misread. A model that writes an override anywhere in its prose, or
+  // quotes text containing one, still gets its ranking counted.
+  const labels=["A","B","C"];
+  const expected=["B","A","C"];
+  const RLO="\u202e", LRO="\u202d", PDF="\u202c";
+  const AR="\u0627\u0644\u062a\u0631\u062a\u064a\u0628";
+
+  // still refused: the override sits on the ranking line
+  for(const line of [
+    AR+": "+LRO+"B > A > C"+PDF,
+    AR+": "+RLO+"B > A > C"+PDF,
+    "RANKING: "+LRO+"B > A > C"+PDF,
+    "RANKING: "+RLO+"B > A > C"+PDF,
+    RLO+"RANKING: B > A > C",
+    "RANKING: B > A > C"+RLO
+  ]) assert.equal(app.parseBallot(line,labels),null,"an override on the ranking line stays refused");
+
+  // now accepted: the override cannot reach the ranking line
+  for(const [why,text] of Object.entries({
+    "override in an earlier paragraph, unclosed": RLO+"\u0645\u0631\u0627\u062c\u0639\u0629\n\n"+AR+": B > A > C",
+    "override in an earlier paragraph, closed":   RLO+"\u0645\u0631\u0627\u062c\u0639\u0629"+PDF+"\n\n"+AR+": B > A > C",
+    "left to right override in earlier prose":    LRO+"note"+PDF+"\nRANKING: B > A > C",
+    "override in a later paragraph":              AR+": B > A > C\n\n"+RLO+"\u0645\u0644\u062d\u0648\u0638\u0629"
+  })) assert.deepEqual(plain(app.parseBallot(text,labels)),expected,why);
+
+  // the reader is told which of the two happened
+  assert.equal(app.ballotAmbiguous(AR+": "+RLO+"B > A > C"+PDF,labels),true,"an otherwise valid override ballot is reported as ambiguous");
+  assert.equal(app.ballotAmbiguous(RLO+"prose\n\n"+AR+": B > A > C",labels),false,"an override elsewhere is not");
+  assert.equal(app.ballotAmbiguous("RANKING: B > A > C",labels),false,"a clean ballot is not ambiguous");
+  assert.equal(app.ballotAmbiguous("RANKING: "+RLO+"B > A"+PDF,labels),false,"an incomplete ballot is not misreported as an override-only refusal");
+  assert.equal(app.ballotAmbiguous("RANKING: "+RLO+"not a ranking"+PDF,labels),false,"a malformed ballot is not misreported as an override-only refusal");
+  assert.equal(app.ballotAmbiguous("no ranking here at all",labels),false,"prose with no marker is not ambiguous");
+  assert.equal(app.ballotAmbiguous("",labels),false,"empty text is not ambiguous");
+
+  // every language carries the explanation, and it differs from the generic note
+  for(const locale of app.SUPPORTED_LOCALES){
+    const amb=app.I18N[locale]["ballot.ambiguous"];
+    assert.equal(typeof amb,"string");
+    assert.ok(amb.trim().length>0,locale+" explains the refusal");
+    assert.notEqual(amb,app.I18N[locale]["ballot.none"],locale+" does not repeat the generic advice");
+  }
+});
+
+test("a refused ballot says why instead of repeating advice already followed",()=>{
+  // Before this, an override made the header read "paste a reply containing e.g.
+  // RANKING: B > A > C" to a reader who had pasted exactly that. The header now
+  // distinguishes nothing found from found but ambiguous.
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"ballot"}
+  ];
+  const s=stateFor(turns,ps,["one","two",""]); s.cursor=2;
+  app.setState(s);
+  const head=document.getElementById("ballotHead");
+  const answer=document.getElementById("answer");
+
+  answer.value="I have not decided yet.";
+  app.renderBallotBox();
+  assert.equal(head.textContent,app.tr("en","ballot.none"),"nothing found reads as nothing found");
+
+  answer.value="RANKING: \u202eB > A\u202c";
+  app.renderBallotBox();
+  assert.equal(head.textContent,app.tr("en","ballot.ambiguous"),"an override is explained");
+  assert.equal(s.ballots[2],null,"and nothing is counted from it");
+
+  answer.value="RANKING: B > A";
+  app.updateBallotFromAnswer();
+  assert.deepEqual(plain(s.ballots[2]),["B","A"],"a clean ballot is still read");
+  app.renderBallotBox();
+  assert.equal(head.textContent,app.tr("en","ballot.bestFirst"));
+  app.setState(null);
+});
+
+test("lane geometry never follows the label direction",()=>{
+  // The lane is deliberately pinned left to right so progress reads as a
+  // timeline, while each station restores right to left for its Arabic label.
+  // Anything inside a station that positions itself on the inline axis therefore
+  // inherits the wrong direction. This has already happened twice: the connector
+  // was drawn a full station the wrong way, and the round label sat 62.34 pixels
+  // off its station. Measured in a browser, all 34 lane descendants now share the
+  // same centers in English and Arabic. This guard is what keeps a third case
+  // from being introduced silently.
+  const bodyOf=sel=>{
+    const at=html.indexOf(sel+"{");
+    if(at<0) return null;
+    return html.slice(at+sel.length+1,html.indexOf("}",at));
+  };
+  const LOGICAL=/(?:inset|margin|padding|border)-inline|text-align:\s*(?:start|end)|float:\s*inline/;
+  const rules=[...html.matchAll(/([^{}\n]+)\{([^}]*)\}/g)]
+    .map(m=>({sel:m[1].trim(),body:m[2]}))
+    .filter(r=>/(?:^|\s)\.(?:lane|lanewrap|station|lap|node|nm|bar)\b/.test(r.sel));
+  assert.ok(rules.length>=6,"the lane rules were found, got "+rules.length);
+  const offenders=[];
+  for(const r of rules){
+    if(!LOGICAL.test(r.body)) continue;
+    // a logical property is allowed only where the element's direction is pinned
+    // back to the lane, which is what makes the inline axis physical again
+    const bare=r.sel.replace(/^html\[dir="rtl"\]\s*/,"");
+    const pin=bodyOf('html[dir="rtl"] '+bare);
+    if(!pin||!/direction:ltr/.test(pin)) offenders.push(r.sel);
+  }
+  assert.deepEqual(offenders,[],
+    "these lane rules place themselves on the inline axis without pinning their direction to the lane");
+
+  // the two that were actually wrong, stated concretely
+  assert.match(html,/\.lap\{[^}]*left:50%/,"the round label uses the physical center of the timeline");
+  assert.doesNotMatch(html,/\.lap\{[^}]*inset-inline-start/,"the round label must not follow the label direction");
+  assert.match(html,/html\[dir="rtl"\] \.station \.bar\{direction:ltr\}/,"the connector stays pinned to the lane");
+});
+
+test("arriving at a ballot turn reports that turn's answer, not the previous one",()=>{
+  // The ballot header is derived from the answer field rather than from stored
+  // state, so renderTurn has to fill the field before it renders the box. If the
+  // order were reversed the reader would see a verdict about the turn they just
+  // left. Navigation is the only way this ordering is exercised.
+  const RLO="\u202e", PDF="\u202c";
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"ballot"}
+  ];
+  const head=()=>document.getElementById("ballotHead").textContent;
+
+  // an override ballot that is complete and valid once the control is removed
+  const s=stateFor(turns,ps,["one","two","RANKING: "+RLO+"B > A"+PDF]);
+  s.cursor=0;
+  app.setState(s);
+  app.renderTurn();
+  document.getElementById("answer").value="one";   // the field holds turn 0
+  s.cursor=2;
+  app.renderTurn();
+  assert.equal(head(),app.tr("en","ballot.ambiguous"),
+    "the header describes the ballot turn that was opened");
+  assert.equal(app.effectiveBallot(2),null,"and the override ballot is still not counted");
+
+  // the same arrival with a clean ballot. Arriving does not reparse, so the
+  // stored ranking is what a restored or imported session carries.
+  const s2=stateFor(turns,ps,["one","two","RANKING: B > A"]);
+  s2.cursor=2; s2.ballots[2]=["B","A"];
+  app.setState(s2);
+  app.renderTurn();
+  assert.deepEqual(plain(app.effectiveBallot(2)),["B","A"]);
+  assert.equal(head(),app.tr("en","ballot.bestFirst"));
+  // an override ballot can never arrive already parsed, because the parser
+  // refuses it on the way in
+  assert.equal(app.parseBallot("RANKING: "+RLO+"B > A"+PDF,["A","B"]),null);
+
+  // and with a partial one, which is refused for a reason the override wording
+  // would misdescribe
+  const s3=stateFor(turns,ps,["one","two","RANKING: "+RLO+"B"+PDF]);
+  s3.cursor=2;
+  app.setState(s3);
+  app.renderTurn();
+  assert.equal(head(),app.tr("en","ballot.none"),"an incomplete line keeps the ordinary message");
+  app.setState(null);
+});
+
+test("transcript search matches text that carries invisible direction marks",()=>{
+  // A pasted right-to-left answer can hold a direction mark inside a word. The
+  // reader types the word without it, so the search has to fold both the same way.
+  assert.equal(app.foldTranscriptText("Rev\u200fision"),app.foldTranscriptText("revision"));
+  assert.equal(app.foldTranscriptText("\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628"),app.foldTranscriptText("\u0627\u0644\u062a\u0631\u062a\u064a\u0628"));
+  assert.equal(app.foldTranscriptText("\u202bALPHA\u202c"),app.foldTranscriptText("alpha"));
+  // folding still does its original jobs
+  assert.equal(app.foldTranscriptText("R\u00c9VISION"),"revision","accents and case still fold");
+  assert.equal(app.foldTranscriptText("Clasificaci\u00f3n"),"clasificacion");
+
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"}
+  ];
+  const s=stateFor(turns,ps,["\u200f\u0627\u0644\u062a\u0631\u062a\u064a\u0628 marked answer","ordinary answer"]);
+  const captured=JSON.stringify(s.answers);
+  app.setState(s);
+  app.setTranscriptFilters({query:"\u0627\u0644\u062a\u0631\u062a\u064a\u0628"});
+  assert.equal(app.transcriptTurnMatches(0),true,"a marked answer is found by the unmarked word");
+  assert.equal(app.transcriptTurnMatches(1),false);
+  assert.equal(JSON.stringify(app.getState().answers),captured,"searching never rewrites a captured answer");
+  app.setTranscriptFilters({});
+  app.setState(null);
 });
 
 test("standalone privacy boundary remains intact",()=>{
