@@ -624,6 +624,7 @@ test("a language spells counted nouns with the forms it actually distinguishes",
 
   // and the labels the interface builds go through the same rule
   assert.equal(app.pointLabel("ar",3),app.tr("ar","score.point.few",{points:3}));
+  assert.equal(app.pointLabel("ar",2),"نقطتان","the Arabic dual is used for two points");
   assert.equal(app.pointLabel("ar",11),app.tr("ar","score.point.many",{points:11}));
   assert.equal(app.pointLabel("fr",1),"1 pt");
   assert.equal(app.pointLabel("fr",0),"0 pts","French keeps the form it was reviewed with");
@@ -647,7 +648,22 @@ test("a language spells counted nouns with the forms it actually distinguishes",
   const s=stateFor(turns,ps,["one","two","الترتيب: B > A","الترتيب: A > B"]);
   s.promptLocale="ar"; s.ballots[2]=["B","A"]; s.ballots[3]=["A","B"];
   app.setState(s);
-  assert.match(app.reviewPacketMd("RPPLURAL123"),/تصويتان/,"the review packet uses the ballot dual");
+  const arPacket=app.reviewPacketMd("RPPLURAL123");
+  assert.match(arPacket,/التصويتات المحتسبة: تصويتان/,
+    "the review packet keeps the ballot dual in a standalone nominative phrase");
+  const twoAnswers=app.countLabel("answer",2);
+  assert.equal(app.tr("ar","done.withSynth",{answers:twoAnswers}),
+    "لديك الآن إجابتان وخلاصة محفوظة. يمكنك تنزيل السجل أو المتابعة.");
+  assert.equal(app.tr("ar","done.withoutSynth",{answers:twoAnswers}),
+    "لديك الآن إجابتان في السجل. يمكنك تنزيله أو المتابعة.");
+  const arRecovery=app.tr("ar","recovery.message",{
+    reason:app.tr("ar","recovery.reason.restart"),when:"12:00",answers:twoAnswers,question:"سؤال"
+  });
+  assert.match(arRecovery,/قبل أن تبدأ تمريرا جديدا/,
+    "the recovery reason follows before an with a present verb");
+  assert.match(arRecovery,/فيها إجابتان/,
+    "the recovery sentence keeps the shared dual in a nominative position");
+  assert.doesNotMatch(arRecovery,/قبل أن (بدأت|تجاهلت|فتحت)|على إجابتان|تم حفظ إجابتان/);
   app.setState(null);
   storage.clear();
   app.setUiLocale(before||"en",false);
@@ -674,6 +690,17 @@ test("registered language packs have identical keys and placeholders",()=>{
       const shape=placeholders(app.I18N[locale][key]);
       if(shape.length) assert.deepEqual(shape,placeholders(app.I18N.en[family+".other"]),`${locale}: ${key}`);
     }
+  }
+  assert.equal(app.I18N.de["format.markdown.directive"].includes("auf die gerenderte Darstellung"),true,
+    "the reviewed German directive keeps its required article");
+  assert.equal(app.I18N.de["recovery.restoreAria"],"Gespeichertes Relay wiederherstellen");
+  assert.equal(app.I18N.de["recovery.removeAria"],"Gespeicherte Wiederherstellungskopie entfernen");
+  assert.equal(app.I18N.ar["recovery.reason.restart"],"تبدأ تمريرا جديدا");
+  assert.equal(app.I18N.ar["recovery.reason.discard"],"تتجاهل تمريرا محفوظا");
+  assert.equal(app.I18N.ar["recovery.reason.replace"],"تفتح جلسة أخرى");
+  for(const key of ["format.markdown.hint","format.markdown.directive","format.block.name","format.block.hint","format.block.directive"]){
+    assert.equal(/كتلة رمز|كتل الرمز|أمثلة الرمز/.test(app.I18N.ar[key]),false,
+      key+" uses reviewed Arabic code terminology");
   }
   // Once a locale opts in, every counted family must be complete. Omitting all
   // optional forms from one family is still a partial catalog, not an opt-out.

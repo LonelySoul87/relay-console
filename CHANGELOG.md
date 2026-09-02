@@ -107,13 +107,29 @@ right-to-left interface support.
   written in the prompt language, which is not always the interface language, so
   the lookup takes the locale rather than assuming the interface one.
 
+- Arabic completion, recovery, and ballot-count messages now keep shared dual
+  labels in standalone nominative positions instead of placing `ان` forms where
+  the surrounding grammar requires `ين`.
+- Arabic recovery reasons after `قبل أن` now use the present forms `تبدأ`,
+  `تتجاهل`, and `تفتح`. The two-point score label now uses `نقطتان`.
+- Arabic code-format instructions now use `تعليمات برمجية` and `شفرة` instead of
+  the misleading word `رمز` for programming code.
+- German recovery action names no longer describe the checkpoint as already
+  restored. Recovery, privacy, plan, shortcut, and prompt wording received a
+  focused grammar and clarity pass.
+
 ### Review status
 
 - All 356 automated checks pass across the current and historical suites.
 - Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
   without clipping, horizontal overflow, warning, or error.
-- German and Arabic wording should receive an independent peer or fluent-human
-  review before publication.
+- An evidence-backed agent review has resolved the known German and Arabic
+  wording defects. Fluent-human sign-off remains recommended for native tone and
+  regional preference.
+- No physical touchscreen or screen-reader listening session has been completed.
+  The development machine reports no touch digitizer. Automated focus,
+  accessible-name, live-region, keyboard, target-size, and reflow checks pass,
+  but do not replace those two manual checks.
 
 ## v2.4.0
 
