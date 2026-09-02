@@ -105,12 +105,12 @@ const sandbox={
   alert(message){sandbox.__alerts.push(String(message));},confirm(){return sandbox.__confirmReplies.length?sandbox.__confirmReplies.shift():sandbox.__confirmReply;},prompt(){return sandbox.__promptReply;},
   setTimeout(callback,delay=0){const id=++sandbox.__nextTimerId;sandbox.__timers.push({id,callback,delay});return id;},
   clearTimeout(id){sandbox.__timers=sandbox.__timers.filter(timer=>timer.id!==id);},
-  Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error
+  Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error,Intl
 };
 vm.createContext(sandbox);
 const exportsCode=`
 globalThis.__relayTest={
-  parseBallot,ballotAmbiguous,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
+  parseBallot,ballotAmbiguous,pluralSuffix,countLabel,pointLabel,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   stripBidiMarks,foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,presetStatusNames,presetExportStatus,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
@@ -204,14 +204,99 @@ test("ballot parser accepts one explicit, exact ranking line",()=>{
   assert.deepEqual(Array.from(app.parseBallot("الترتيب: B > A > C",["A","B","C"])),["B","A","C"]);
 });
 
+test("a language spells counted nouns with the forms it actually distinguishes",()=>{
+  // Arabic distinguishes six count forms. English distinguishes two, so a
+  // catalog built on the English pair cannot spell the dual, and it cannot spell
+  // the form Arabic uses from 11 upward, where the counted noun goes back to the
+  // singular. Before this, an Arabic reader saw the plural everywhere:
+  //     2 answers   gave "2 \u0625\u062c\u0627\u0628\u0627\u062a"   where Arabic wants "\u0625\u062c\u0627\u0628\u062a\u0627\u0646"
+  //    11 answers   gave "11 \u0625\u062c\u0627\u0628\u0627\u062a"  where Arabic wants "11 \u0625\u062c\u0627\u0628\u0629"
+  const say=(locale,family,n)=>app.tr(locale,family+"."+app.pluralSuffix(locale,family,n),{count:n,points:n});
+  const expected={
+    0:"\u0644\u0627 \u0625\u062c\u0627\u0628\u0627\u062a",
+    1:"\u0625\u062c\u0627\u0628\u0629 \u0648\u0627\u062d\u062f\u0629",
+    2:"\u0625\u062c\u0627\u0628\u062a\u0627\u0646",
+    3:"3 \u0625\u062c\u0627\u0628\u0627\u062a",
+    10:"10 \u0625\u062c\u0627\u0628\u0627\u062a",
+    11:"11 \u0625\u062c\u0627\u0628\u0629",
+    26:"26 \u0625\u062c\u0627\u0628\u0629",
+    100:"100 \u0625\u062c\u0627\u0628\u0629"
+  };
+  for(const [n,text] of Object.entries(expected)) assert.equal(say("ar","common.answer",Number(n)),text,"ar n="+n);
+  // the category actually chosen, so a wrong catalog cannot pass by coincidence
+  assert.equal(app.pluralSuffix("ar","common.answer",2),"two");
+  assert.equal(app.pluralSuffix("ar","common.answer",5),"few");
+  assert.equal(app.pluralSuffix("ar","common.answer",11),"many");
+  assert.equal(app.pluralSuffix("ar","common.answer",0),"zero");
+
+  // the four languages reviewed before this keep the two-form behaviour exactly
+  for(const locale of ["en","fr","es","de"]){
+    for(const family of ["common.answer","common.ballot","presets.participant","presets.round","score.point"]){
+      for(const n of [0,1,2,3,11,26,100]){
+        assert.equal(app.pluralSuffix(locale,family,n),n===1?"one":"other",locale+" "+family+" n="+n);
+      }
+    }
+  }
+  // a family a language has not extended still falls back to the pair
+  assert.equal(app.pluralSuffix("de","common.answer",2),"other");
+  // an unknown language cannot throw
+  assert.equal(app.pluralSuffix("zz","common.answer",2),"other");
+
+  // the interface path itself, which is what a reader actually sees
+  const before=app.getUiLocale();
+  app.setUiLocale("ar");
+  assert.equal(app.countLabel("answer",2),"\u0625\u062c\u0627\u0628\u062a\u0627\u0646","the dual reaches the interface");
+  assert.equal(app.countLabel("answer",11),"11 \u0625\u062c\u0627\u0628\u0629");
+  assert.equal(app.countLabel("ballot",2),"\u062a\u0635\u0648\u064a\u062a\u0627\u0646");
+  assert.equal(app.countLabel("ballot",11),"11 \u062a\u0635\u0648\u064a\u062a\u0627");
+  app.setUiLocale("de");
+  assert.equal(app.countLabel("answer",2),"2 Antworten","German is untouched");
+  assert.equal(app.countLabel("answer",1),"1 Antwort");
+  app.setUiLocale(before||"en");
+
+  // a catalog declares either none of the extra forms or exactly the ones its
+  // language distinguishes, so no count can land on a form it does not have
+  const FAMILIES=["common.answer","common.ballot","presets.participant","presets.round","score.point"];
+  const OPTIONAL=["zero","two","few","many"];
+  for(const locale of app.SUPPORTED_LOCALES){
+    const wanted=new Intl.PluralRules(locale).resolvedOptions().pluralCategories.filter(c=>OPTIONAL.includes(c)).sort();
+    for(const family of FAMILIES){
+      const declared=OPTIONAL.filter(c=>app.I18N[locale][family+"."+c]!==undefined).sort();
+      if(declared.length) assert.deepEqual(declared,wanted,locale+" "+family);
+    }
+  }
+  assert.deepEqual(OPTIONAL.filter(c=>app.I18N.ar["common.answer."+c]!==undefined).sort(),
+    ["few","many","two","zero"],"Arabic declares all four");
+  assert.deepEqual(OPTIONAL.filter(c=>app.I18N.de["common.answer."+c]!==undefined),[],"German declares none");
+
+  // and the labels the interface builds go through the same rule
+  assert.equal(app.pointLabel("ar",3),app.tr("ar","score.point.few",{points:3}));
+  assert.equal(app.pointLabel("ar",11),app.tr("ar","score.point.many",{points:11}));
+  assert.equal(app.pointLabel("fr",1),"1 pt");
+  assert.equal(app.pointLabel("fr",0),"0 pts","French keeps the form it was reviewed with");
+});
+
 test("registered language packs have identical keys and placeholders",()=>{
   const enKeys=Object.keys(app.I18N.en).sort();
   const placeholders=value=>Array.from(String(value).matchAll(/\{([A-Za-z0-9_]+)\}/g),m=>m[1]).sort();
   assert.equal("confirm.import" in app.I18N.en,false);
   assert.deepEqual(Array.from(app.SUPPORTED_LOCALES),["en","fr","es","de","ar"]);
+  // A language may add the count forms English does not distinguish. Everything
+  // else still has to match English exactly, key for key and placeholder for
+  // placeholder.
+  const FAMILIES=["common.answer","common.ballot","presets.participant","presets.round","score.point"];
+  const OPTIONAL=["zero","two","few","many"];
+  const isOptional=key=>FAMILIES.some(f=>OPTIONAL.some(c=>key===f+"."+c));
+  assert.equal(enKeys.some(isOptional),false,"English declares only the pair it distinguishes");
   for(const locale of app.SUPPORTED_LOCALES){
-    assert.deepEqual(Object.keys(app.I18N[locale]).sort(),enKeys,locale);
+    const keys=Object.keys(app.I18N[locale]);
+    assert.deepEqual(keys.filter(k=>!isOptional(k)).sort(),enKeys,locale);
     for(const key of enKeys) assert.deepEqual(placeholders(app.I18N[locale][key]),placeholders(app.I18N.en[key]),`${locale}: ${key}`);
+    for(const key of keys.filter(isOptional)){
+      const family=key.slice(0,key.lastIndexOf("."));
+      const shape=placeholders(app.I18N[locale][key]);
+      if(shape.length) assert.deepEqual(shape,placeholders(app.I18N.en[family+".other"]),`${locale}: ${key}`);
+    }
   }
 });
 
@@ -2576,6 +2661,54 @@ test("lane geometry never follows the label direction",()=>{
   assert.match(html,/\.lap\{[^}]*left:50%/,"the round label uses the physical center of the timeline");
   assert.doesNotMatch(html,/\.lap\{[^}]*inset-inline-start/,"the round label must not follow the label direction");
   assert.match(html,/html\[dir="rtl"\] \.station \.bar\{direction:ltr\}/,"the connector stays pinned to the lane");
+});
+
+test("arriving at a ballot turn reports that turn's answer, not the previous one",()=>{
+  // The ballot header is derived from the answer field rather than from stored
+  // state, so renderTurn has to fill the field before it renders the box. If the
+  // order were reversed the reader would see a verdict about the turn they just
+  // left. Navigation is the only way this ordering is exercised.
+  const RLO="\u202e", PDF="\u202c";
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"ballot"}
+  ];
+  const head=()=>document.getElementById("ballotHead").textContent;
+
+  // an override ballot that is complete and valid once the control is removed
+  const s=stateFor(turns,ps,["one","two","RANKING: "+RLO+"B > A"+PDF]);
+  s.cursor=0;
+  app.setState(s);
+  app.renderTurn();
+  document.getElementById("answer").value="one";   // the field holds turn 0
+  s.cursor=2;
+  app.renderTurn();
+  assert.equal(head(),app.tr("en","ballot.ambiguous"),
+    "the header describes the ballot turn that was opened");
+  assert.equal(app.effectiveBallot(2),null,"and the override ballot is still not counted");
+
+  // the same arrival with a clean ballot. Arriving does not reparse, so the
+  // stored ranking is what a restored or imported session carries.
+  const s2=stateFor(turns,ps,["one","two","RANKING: B > A"]);
+  s2.cursor=2; s2.ballots[2]=["B","A"];
+  app.setState(s2);
+  app.renderTurn();
+  assert.deepEqual(plain(app.effectiveBallot(2)),["B","A"]);
+  assert.equal(head(),app.tr("en","ballot.bestFirst"));
+  // an override ballot can never arrive already parsed, because the parser
+  // refuses it on the way in
+  assert.equal(app.parseBallot("RANKING: "+RLO+"B > A"+PDF,["A","B"]),null);
+
+  // and with a partial one, which is refused for a reason the override wording
+  // would misdescribe
+  const s3=stateFor(turns,ps,["one","two","RANKING: "+RLO+"B"+PDF]);
+  s3.cursor=2;
+  app.setState(s3);
+  app.renderTurn();
+  assert.equal(head(),app.tr("en","ballot.none"),"an incomplete line keeps the ordinary message");
+  app.setState(null);
 });
 
 test("transcript search matches text that carries invisible direction marks",()=>{

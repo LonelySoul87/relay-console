@@ -70,9 +70,23 @@ right-to-left interface support.
 - Link-style transcript and coaching actions now meet the 24 by 24 CSS-pixel
   minimum pointer target size. They previously rendered only 16 pixels high.
 
+- Arabic now spells counted nouns with the forms the language actually
+  distinguishes. Arabic has six count categories where English has two, so a
+  catalog built on the English pair could not spell the dual, and could not spell
+  the form used from 11 upward, where the counted noun returns to the singular.
+  Two answers read as the plural rather than the dual, and eleven answers read as
+  the plural rather than the singular. A language now receives its full set of
+  categories only once its own catalog supplies one of the extra forms, so
+  English, French, Spanish, and German render exactly as they did before.
+- Catalogs must declare either none of the extra count forms or exactly the ones
+  their language distinguishes, so a count cannot land on a form the language
+  does not have.
+- Arriving at a ballot turn now reports that turn's answer rather than the
+  previous one, and the ordering that guarantees it is covered.
+
 ### Review status
 
-- All 346 automated checks pass across the current and historical suites.
+- All 348 automated checks pass across the current and historical suites.
 - Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
   without clipping, horizontal overflow, warning, or error.
 - German and Arabic wording should receive an independent peer or fluent-human
