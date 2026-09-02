@@ -87,9 +87,24 @@ right-to-left interface support.
   ballot turn continues to report that turn's answer rather than the previous
   one.
 
+- The page no longer refuses to open where the platform has no plural data for a
+  language. Asking the platform which count forms a language distinguishes is
+  reasonable, but a build with reduced locale data does not report failure for an
+  unsupported language: it quietly answers for a different one. Holding the
+  catalog to that answer refused to start at all, and trusting it would have
+  applied another language's count boundaries. The answer is now used only when
+  the platform confirms it resolved the language that was asked for.
+- The Arabic rule now travels with the file, so Arabic counts stay correct on a
+  runtime that has no data for it. A check holds the carried rule against the
+  platform wherever the platform does know Arabic, so the two cannot drift apart.
+- The import preview counts participants instead of always saying participants. It
+  spelled the noun inside the sentence and passed a bare number, so a preset
+  holding one participant read as "1 participants" in English, "1 participantes"
+  in Spanish, and the plural at every count in Arabic.
+
 ### Review status
 
-- All 348 automated checks pass across the current and historical suites.
+- All 353 automated checks pass across the current and historical suites.
 - Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
   without clipping, horizontal overflow, warning, or error.
 - German and Arabic wording should receive an independent peer or fluent-human

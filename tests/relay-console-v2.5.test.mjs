@@ -110,7 +110,7 @@ const sandbox={
 vm.createContext(sandbox);
 const exportsCode=`
 globalThis.__relayTest={
-  parseBallot,ballotAmbiguous,registerLocale,pluralSuffix,countLabel,pointLabel,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
+  parseBallot,ballotAmbiguous,registerLocale,pluralSuffix,pluralRuleFor,BUILTIN_PLURAL,countLabel,pointLabel,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   stripBidiMarks,foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,presetStatusNames,presetExportStatus,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
@@ -202,6 +202,150 @@ test("ballot parser accepts one explicit, exact ranking line",()=>{
   assert.deepEqual(Array.from(app.parseBallot("CLASIFICACION: B > C > A",["A","B","C"])),["B","C","A"]);
   assert.deepEqual(Array.from(app.parseBallot("RANGLISTE: C > B > A",["A","B","C"])),["C","B","A"]);
   assert.deepEqual(Array.from(app.parseBallot("الترتيب: B > A > C",["A","B","C"])),["B","A","C"]);
+});
+
+// Boot the page again in a fresh context with a chosen Intl, to see what a
+// runtime with reduced locale data would do with this file.
+function bootWith(intlImpl){
+  const els=new Map();
+  const doc={
+    activeElement:null,documentElement:new FakeElement("html","html"),body:new FakeElement("body","body"),
+    getElementById(id){if(!els.has(id))els.set(id,new FakeElement(SELECT_IDS.has(id)?"select":"div",id));return els.get(id);},
+    createElement(tag){return new FakeElement(tag);},querySelectorAll(){return [];},addEventListener(){},execCommand(){return false;}
+  };
+  const store=new Map();
+  const box={console,document:doc,
+    localStorage:{setItem(k,v){store.set(String(k),String(v));},getItem(k){return store.has(String(k))?store.get(String(k)):null;},removeItem(k){store.delete(String(k));}},
+    navigator:{clipboard:null},window:{open(){},matchMedia(){return{matches:false};}},
+    Blob,URL,FileReader:FakeFileReader,alert(){},confirm(){return true;},prompt(){return null;},
+    setTimeout(){return 0;},clearTimeout(){},
+    Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error,Intl:intlImpl};
+  vm.createContext(box);
+  try{
+    vm.runInContext(html.slice(scriptStart,scriptEnd)+"globalThis.__probe={countedMessage,pluralSuffix,registerLocale,I18N,SUPPORTED_LOCALES};",box,{filename:"reboot"});
+    return {loaded:true,app:box.__probe};
+  }catch(err){ return {loaded:false,error:String(err&&err.message)}; }
+}
+
+test("the import preview counts participants instead of always saying participants",()=>{
+  // The preview spelled the noun inside the sentence and passed a bare number,
+  // so a preset holding one participant read as "1 participants" in English,
+  // "1 participantes" in Spanish, and the plural in Arabic at every count.
+  const line=(locale,n)=>{
+    const before=app.getUiLocale();
+    app.setUiLocale(locale);
+    app.renderImportPreview({kind:"presets",value:{presets:[]},merged:[],imported:[],warnings:[],
+      summary:{count:1,items:[{name:"QA",participants:n,recipe:"blind"}]}});
+    const text=document.getElementById("importPreviewItems").children[0].textContent;
+    app.closeImportPreview();
+    app.setUiLocale(before||"en");
+    return text;
+  };
+  assert.match(line("en",1),/QA · 1 participant ·/,"one participant is singular");
+  assert.match(line("en",3),/QA · 3 participants ·/);
+  assert.match(line("es",1),/QA · 1 participante ·/,"Spanish singular");
+  // Arabic picks the dual and the singular the same way every other surface does
+  assert.ok(line("ar",2).includes("\u0645\u0634\u0627\u0631\u0643\u0627\u0646"),"Arabic dual: "+line("ar",2));
+  assert.ok(line("ar",11).includes("11 \u0645\u0634\u0627\u0631\u0643\u0627"),"Arabic 11: "+line("ar",11));
+  assert.ok(line("ar",1).includes("\u0645\u0634\u0627\u0631\u0643 \u0648\u0627\u062d\u062f"),"Arabic one: "+line("ar",1));
+  // and no catalog spells the noun in the sentence any more
+  for(const locale of app.SUPPORTED_LOCALES){
+    assert.equal(app.I18N[locale]["importPreview.presetLine"],"{name} · {participants} · {plan}",locale);
+  }
+});
+
+test("no counted surface picks its own singular or plural",()=>{
+  // Three surfaces were fixed after each was found choosing between one and other
+  // by hand: the preset participant summary, the preset round summary, and the
+  // review packet ballot count. Each was invisible to a test that only exercised
+  // the selector. This holds the whole file to the rule instead.
+  const script=html.slice(scriptStart,scriptEnd);
+  // the catalogs legitimately spell every form, so set their lines aside
+  const code=script.split(/\r?\n/).filter(line=>!/^\s*"[a-zA-Z0-9_.]+":"/.test(line)).join("\n");
+
+  // the only place allowed to choose between the two forms by hand is the
+  // selector itself, where it is the documented fallback
+  const selector=code.slice(code.indexOf("function pluralSuffix"),code.indexOf("function countedMessage"));
+  assert.ok(selector.includes("pluralSuffix"),"the selector was located");
+  const outside=code.replace(selector,"").replace(/function pluralRuleFor[\s\S]*?\n}/,"");
+  assert.doesNotMatch(outside,/\?\s*"one"\s*:\s*"other"/,
+    "a surface is choosing its own singular or plural instead of asking the selector");
+
+  // and every counted family named in code goes through the shared helper
+  const FAMILIES=["common.answer","common.ballot","presets.participant","presets.round","score.point"];
+  for(const family of FAMILIES){
+    assert.equal(outside.includes(family+"."),false,
+      family+" is being addressed form by form outside the selector");
+  }
+  // the helper exists and every counted call site routes through it
+  assert.ok(code.includes("function countedMessage(locale,family,count)"),"the shared helper exists");
+  assert.ok(code.includes("function countLabel(kind,count){ return countedMessage("),"countLabel routes through it");
+  assert.ok(code.includes("function pointLabel(locale,points){ return countedMessage("),"pointLabel routes through it");
+  for(const site of ["presets.participant","presets.round","common.ballot"]){
+    const viaUi=code.includes('countedMessage(uiLocale,"'+site+'"');
+    const viaArg=code.includes('countedMessage(locale,"'+site+'"');
+    assert.ok(viaUi||viaArg,site+" must be counted through the helper");
+  }
+});
+
+test("the page still opens where the platform has no plural data for a language",()=>{
+  // Intl.PluralRules does not report failure for a language it lacks data for.
+  // It quietly answers for a different one. Trusting that answer would apply
+  // another language's count boundaries, and holding the catalog to it would
+  // refuse to start. A file that has to open anywhere offline must not die
+  // because a browser shipped without Arabic data.
+  const ANSWER_TWO="\u0625\u062c\u0627\u0628\u062a\u0627\u0646";
+  const runtimes={
+    "full data":Intl,
+    "no data for Arabic":{PluralRules:class{
+      resolvedOptions(){return {locale:"en",pluralCategories:["one","other"],type:"cardinal"};}
+      select(n){return n===1?"one":"other";}
+    }},
+    "no Intl at all":undefined,
+    "PluralRules throws":{PluralRules:class{constructor(){throw new RangeError("no plural data");}}},
+    "resolvedOptions throws":{PluralRules:class{resolvedOptions(){throw new Error("nope");} select(){return "other";}}}
+  };
+  for(const [label,impl] of Object.entries(runtimes)){
+    const booted=bootWith(impl);
+    assert.equal(booted.loaded,true,label+" must still open: "+(booted.error||""));
+    // and Arabic is still spelled correctly, because the rule travels with the file
+    assert.equal(booted.app.countedMessage("ar","common.answer",2),ANSWER_TWO,label);
+    assert.equal(booted.app.countedMessage("ar","common.answer",11),"11 \u0625\u062c\u0627\u0628\u0629",label);
+    assert.equal(booted.app.countedMessage("de","common.answer",2),"2 Antworten",label+": German is unaffected");
+  }
+});
+
+test("the carried Arabic rule agrees with the platform everywhere the platform knows Arabic",()=>{
+  // The file carries the Arabic rule so it does not depend on the browser having
+  // the data. That is a second statement of the same rule, so it is pinned to the
+  // platform here and cannot drift unnoticed.
+  const platform=new Intl.PluralRules("ar");
+  assert.equal(platform.resolvedOptions().locale.split("-")[0],"ar","this runtime does know Arabic");
+  for(let n=0;n<=1000;n++){
+    assert.equal(app.BUILTIN_PLURAL.ar.select(n),platform.select(n),"n="+n);
+  }
+  assert.deepEqual(plain(app.BUILTIN_PLURAL.ar.categories).slice().sort(),
+    platform.resolvedOptions().pluralCategories.slice().sort());
+  // only Arabic needs one, because only Arabic distinguishes forms English lacks
+  assert.deepEqual(plain(Object.keys(app.BUILTIN_PLURAL)),["ar"]);
+});
+
+test("a language the platform cannot resolve is left alone rather than refused",()=>{
+  // A private use code no platform has data for. The rule lookup must decline it
+  // instead of accepting an answer meant for another language.
+  assert.equal(app.pluralRuleFor("qaa"),null,"no rule is invented for an unknown language");
+  assert.equal(app.pluralSuffix("qaa","common.answer",2),"other");
+  assert.equal(app.pluralSuffix("qaa","common.answer",1),"one");
+  // Registering such a pack, extra forms and all, must not throw. This runs in a
+  // throwaway context so the probe language never joins the real registry.
+  const probe=bootWith(Intl);
+  assert.equal(probe.loaded,true);
+  const pack={...probe.app.I18N.en,"common.answer.two":"two answers","common.answer.zero":"no answers",
+    "common.answer.few":"{count} answers","common.answer.many":"{count} answers"};
+  assert.doesNotThrow(()=>probe.app.registerLocale("qab","Probe",pack));
+  assert.equal(probe.app.pluralSuffix("qab","common.answer",2),"other","and it falls back to the pair");
+  // the real registry is untouched
+  assert.deepEqual(Array.from(app.SUPPORTED_LOCALES),["en","fr","es","de","ar"]);
 });
 
 test("a language spells counted nouns with the forms it actually distinguishes",()=>{
