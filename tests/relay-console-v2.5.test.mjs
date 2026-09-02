@@ -186,9 +186,16 @@ test("public feedback is discoverable, localized, and keeps private reports out 
   const chooser="https://github.com/LonelySoul87/relay-console/issues/new/choose";
   assert.match(html,new RegExp(`<a href="${chooser.replaceAll("/","\\/")}" target="_blank" rel="noopener noreferrer" data-i18n="footer\\.feedback">`));
   assert.match(html,/\.feedback a\{[^}]*min-height:24px/);
+  const privacyCopy={
+    en:"Reports submitted on GitHub are public. Do not include private questions, answers, session files, or provider conversations.",
+    fr:"Les signalements publiés sur GitHub sont publics. N’y ajoutez aucun contenu privé, notamment des questions, réponses, fichiers de session ou conversations avec un fournisseur.",
+    es:"Las incidencias publicadas en GitHub son públicas. No incluyas contenido privado, como preguntas, respuestas, archivos de sesión o conversaciones con un proveedor.",
+    de:"Auf GitHub veröffentlichte Meldungen sind öffentlich. Füge keine privaten Inhalte wie Fragen, Antworten, Sitzungsdateien oder Unterhaltungen mit Anbietern hinzu.",
+    ar:"البلاغات المنشورة على GitHub علنية. لا ترفق محتوى خاصا، مثل الأسئلة أو الإجابات أو ملفات الجلسات أو محادثات المزودين."
+  };
   for(const locale of ["en","fr","es","de","ar"]){
     assert.ok(app.I18N[locale]["footer.feedback"].trim(),`${locale} names the feedback action`);
-    assert.ok(app.I18N[locale]["footer.feedbackPrivacy"].trim(),`${locale} warns that issues are public`);
+    assert.equal(app.I18N[locale]["footer.feedbackPrivacy"],privacyCopy[locale],`${locale} warns that reports are public without inviting private content`);
   }
   assert.match(bugForm,/^name: Bug report$/m);
   assert.match(bugForm,/id: steps/);
