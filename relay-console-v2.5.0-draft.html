@@ -1086,13 +1086,15 @@ function t(key,vars){ return tr(uiLocale,key,vars); }
 function pt(key,vars){ return tr((state&&state.promptLocale)||promptLocale,key,vars); }
 function pluralRuleFor(code){
   if(!(code in pluralRuleCache)){
-    let rule=null;
-    try{
+    let rule=BUILTIN_PLURAL[code]||null;
+    if(!rule) try{
       const platform=new Intl.PluralRules(code);
-      const resolved=String(platform.resolvedOptions().locale||"").toLowerCase().split(/[-_]/)[0];
-      if(resolved===code) rule={categories:platform.resolvedOptions().pluralCategories,select:n=>platform.select(n)};
+      const options=platform.resolvedOptions();
+      const resolved=String(options.locale||"").toLowerCase().split(/[-_]/)[0];
+      const categories=Array.isArray(options.pluralCategories)&&options.pluralCategories.length?options.pluralCategories:null;
+      if(resolved===code&&categories&&typeof platform.select==="function") rule={categories:categories.slice(),select:n=>platform.select(n)};
     }catch(_){ rule=null; }
-    pluralRuleCache[code]=rule||BUILTIN_PLURAL[code]||null;
+    pluralRuleCache[code]=rule;
   }
   return pluralRuleCache[code];
 }

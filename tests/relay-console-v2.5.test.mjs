@@ -222,7 +222,7 @@ function bootWith(intlImpl){
     Date,Math,Map,Set,Array,String,Number,Boolean,JSON,RegExp,Object,Error,Intl:intlImpl};
   vm.createContext(box);
   try{
-    vm.runInContext(html.slice(scriptStart,scriptEnd)+"globalThis.__probe={countedMessage,pluralSuffix,registerLocale,I18N,SUPPORTED_LOCALES};",box,{filename:"reboot"});
+    vm.runInContext(html.slice(scriptStart,scriptEnd)+"globalThis.__probe={countedMessage,pluralSuffix,pluralRuleFor,registerLocale,I18N,SUPPORTED_LOCALES};",box,{filename:"reboot"});
     return {loaded:true,app:box.__probe};
   }catch(err){ return {loaded:false,error:String(err&&err.message)}; }
 }
@@ -288,7 +288,7 @@ test("no counted surface picks its own singular or plural",()=>{
   }
 });
 
-test("the page still opens where the platform has no plural data for a language",()=>{
+test("the page still opens where platform plural support is missing or incomplete",()=>{
   // Intl.PluralRules does not report failure for a language it lacks data for.
   // It quietly answers for a different one. Trusting that answer would apply
   // another language's count boundaries, and holding the catalog to it would
@@ -303,7 +303,16 @@ test("the page still opens where the platform has no plural data for a language"
     }},
     "no Intl at all":undefined,
     "PluralRules throws":{PluralRules:class{constructor(){throw new RangeError("no plural data");}}},
-    "resolvedOptions throws":{PluralRules:class{resolvedOptions(){throw new Error("nope");} select(){return "other";}}}
+    "resolvedOptions throws":{PluralRules:class{resolvedOptions(){throw new Error("nope");} select(){return "other";}}},
+    "no category list":{PluralRules:class{
+      constructor(locale){this.locale=locale;}
+      resolvedOptions(){return {locale:this.locale,type:"cardinal"};}
+      select(){return "other";}
+    }},
+    "no selector":{PluralRules:class{
+      constructor(locale){this.locale=locale;}
+      resolvedOptions(){return {locale:this.locale,pluralCategories:["one","other"],type:"cardinal"};}
+    }}
   };
   for(const [label,impl] of Object.entries(runtimes)){
     const booted=bootWith(impl);
@@ -312,6 +321,7 @@ test("the page still opens where the platform has no plural data for a language"
     assert.equal(booted.app.countedMessage("ar","common.answer",2),ANSWER_TWO,label);
     assert.equal(booted.app.countedMessage("ar","common.answer",11),"11 \u0625\u062c\u0627\u0628\u0629",label);
     assert.equal(booted.app.countedMessage("de","common.answer",2),"2 Antworten",label+": German is unaffected");
+    if(label==="no category list"||label==="no selector") assert.equal(booted.app.pluralRuleFor("qaa"),null,label+": incomplete platform data is refused");
   }
 });
 

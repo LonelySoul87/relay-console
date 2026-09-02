@@ -87,16 +87,14 @@ right-to-left interface support.
   ballot turn continues to report that turn's answer rather than the previous
   one.
 
-- The page no longer refuses to open where the platform has no plural data for a
-  language. Asking the platform which count forms a language distinguishes is
-  reasonable, but a build with reduced locale data does not report failure for an
-  unsupported language: it quietly answers for a different one. Holding the
-  catalog to that answer refused to start at all, and trusting it would have
-  applied another language's count boundaries. The answer is now used only when
-  the platform confirms it resolved the language that was asked for.
+- The page no longer refuses to open where platform plural support is missing,
+  incomplete, or lacks data for a language. A platform answer is used only when
+  it resolves the requested language and supplies both a category list and a
+  selector function.
 - The Arabic rule now travels with the file, so Arabic counts stay correct on a
-  runtime that has no data for it. A check holds the carried rule against the
-  platform wherever the platform does know Arabic, so the two cannot drift apart.
+  runtime that has no data for it. The carried rule is authoritative for Arabic,
+  and a check holds it against the platform wherever the platform does know
+  Arabic, so the two cannot drift apart.
 - The import preview counts participants instead of always saying participants. It
   spelled the noun inside the sentence and passed a bare number, so a preset
   holding one participant read as "1 participants" in English, "1 participantes"
