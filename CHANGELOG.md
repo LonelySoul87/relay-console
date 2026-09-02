@@ -81,8 +81,11 @@ right-to-left interface support.
 - Catalogs must declare either none of the extra count forms or exactly the ones
   their language distinguishes, so a count cannot land on a form the language
   does not have.
-- Arriving at a ballot turn now reports that turn's answer rather than the
-  previous one, and the ordering that guarantees it is covered.
+- Preset summaries and review packets now use the same plural-category selector
+  as the completion, statistics, recovery, score, and transcript surfaces.
+- A regression guard protects the existing ballot-render order so arriving at a
+  ballot turn continues to report that turn's answer rather than the previous
+  one.
 
 ### Review status
 

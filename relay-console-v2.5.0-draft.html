@@ -737,9 +737,10 @@ function registerLocale(code,label,messages,direction="ltr"){
     });
     const rule=pluralRuleFor(code);
     const wanted=(rule?rule.resolvedOptions().pluralCategories:["one","other"]).filter(c=>PLURAL_OPTIONAL.includes(c)).sort();
+    const extended=Object.keys(messages).some(optional);
     PLURAL_FAMILIES.forEach(family=>{
       const declared=PLURAL_OPTIONAL.filter(c=>messages[`${family}.${c}`]!==undefined).sort();
-      if(declared.length&&declared.join(",")!==wanted.join(",")) throw new Error(`Locale ${code} must declare ${wanted.join(", ")||"no extra forms"} for ${family}`);
+      if(extended&&declared.join(",")!==wanted.join(",")) throw new Error(`Locale ${code} must declare ${wanted.join(", ")||"no extra forms"} for ${family}`);
     });
   }
   LOCALE_REGISTRY[code]=Object.freeze({code,label,direction,messages:Object.freeze(messages)});
@@ -1089,8 +1090,9 @@ function pluralSuffix(code,family,n){
   const category=rule?rule.select(n):(n===1?"one":"other");
   return msgs[`${family}.${category}`]!==undefined?category:"other";
 }
-function countLabel(kind,count){ const family=`common.${kind}`; return t(`${family}.${pluralSuffix(uiLocale,family,count)}`,{count}); }
-function pointLabel(locale,points){ return tr(locale,`score.point.${pluralSuffix(locale,"score.point",points)}`,{points}); }
+function countedMessage(locale,family,count){ return tr(locale,`${family}.${pluralSuffix(locale,family,count)}`,{count,points:count}); }
+function countLabel(kind,count){ return countedMessage(uiLocale,`common.${kind}`,count); }
+function pointLabel(locale,points){ return countedMessage(locale,"score.point",points); }
 function applyStaticLocale(){
   document.documentElement.lang=uiLocale;
   document.documentElement.dir=LOCALE_REGISTRY[uiLocale].direction;
@@ -2456,7 +2458,7 @@ function reviewPacketMd(markerOverride){
   });
   const tally=ballotTally();
   if(tally){
-    const ballotCount=tr(locale,`common.ballot.${tally.ballots===1?"one":"other"}`,{count:tally.ballots});
+    const ballotCount=countedMessage(locale,"common.ballot",tally.ballots);
     material+=`## ${tr(locale,"export.peerHeading")}\n\n${tally.rows.map(row=>`- ${tr(locale,"export.points",{name:safe(row.name),score:pointLabel(locale,row.pts)})}`).join("\n")}\n\n*${tr(locale,"export.ballotsCounted",{ballots:ballotCount})}*\n\n`;
   }
   return `# ${tr(locale,"packet.title")}\n\n${tr(locale,"packet.fenceNote",{nonce:marker})}\n\n[BEGIN REVIEW MATERIAL ${marker}]\n\n${material.trim()}\n\n[END REVIEW MATERIAL ${marker}]\n\n## ${tr(locale,"packet.reviewHeading")}\n\n${tr(locale,"packet.reviewRequest")}\n`;
@@ -2795,9 +2797,9 @@ function renderPresetSummary(){
   const language=preset.promptLocale?LOCALE_NAMES[preset.promptLocale]:t("presets.currentPromptLanguage");
   const details=document.createElement("span"); details.className="people";
   details.textContent=t("presets.summary",{
-    participants:t(`presets.participant.${preset.roster.length===1?"one":"other"}`,{count:preset.roster.length}),
+    participants:countedMessage(uiLocale,"presets.participant",preset.roster.length),
     plan,
-    rounds:t(`presets.round.${preset.rounds===1?"one":"other"}`,{count:preset.rounds}),
+    rounds:countedMessage(uiLocale,"presets.round",preset.rounds),
     format,
     language
   });

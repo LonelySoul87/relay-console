@@ -110,7 +110,7 @@ const sandbox={
 vm.createContext(sandbox);
 const exportsCode=`
 globalThis.__relayTest={
-  parseBallot,ballotAmbiguous,pluralSuffix,countLabel,pointLabel,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
+  parseBallot,ballotAmbiguous,registerLocale,pluralSuffix,countLabel,pointLabel,isExactRanking,effectiveBallot,ballotTally,renderBallotBox,updateBallotFromAnswer,renderTranscript,renderTurn,buildPrompt,markDownstreamStale,saveCurrent,validateSession,
   stripBidiMarks,foldTranscriptText,transcriptTurnMatches,setTranscriptFilters,canNavigateToTurn,navigateLaneToTurn,renderLane,
   sessionHasMeaningfulWork,RECIPES,MAX_PARTICIPANTS,Store,setRecipe,transcriptMd,I18N,LOCALE_REGISTRY,SUPPORTED_LOCALES,tr,setUiLocale,setPromptLocale,loadedRoleSet,localizedRole,
   STARTER_CONFIGS,applyStarter,clearStarterStatus,validatePreset,validatePresetBundle,preparePresetExport,exportPresetBundle,presetStatusNames,presetExportStatus,renamePresetList,duplicatePresetList,mergePresetBundle,importPresetBundle,applyPreset,currentPreset,renderPresets,renderPresetSummary,reviewPacketMd,safeHomepage,describeImport,renderImportPreview,applyPendingImport,closeImportPreview,
@@ -260,9 +260,11 @@ test("a language spells counted nouns with the forms it actually distinguishes",
   const OPTIONAL=["zero","two","few","many"];
   for(const locale of app.SUPPORTED_LOCALES){
     const wanted=new Intl.PluralRules(locale).resolvedOptions().pluralCategories.filter(c=>OPTIONAL.includes(c)).sort();
+    const extended=FAMILIES.some(family=>OPTIONAL.some(c=>app.I18N[locale][family+"."+c]!==undefined));
     for(const family of FAMILIES){
       const declared=OPTIONAL.filter(c=>app.I18N[locale][family+"."+c]!==undefined).sort();
-      if(declared.length) assert.deepEqual(declared,wanted,locale+" "+family);
+      if(extended) assert.deepEqual(declared,wanted,locale+" "+family);
+      else assert.deepEqual(declared,[],locale+" does not partly opt in through "+family);
     }
   }
   assert.deepEqual(OPTIONAL.filter(c=>app.I18N.ar["common.answer."+c]!==undefined).sort(),
@@ -274,6 +276,30 @@ test("a language spells counted nouns with the forms it actually distinguishes",
   assert.equal(app.pointLabel("ar",11),app.tr("ar","score.point.many",{points:11}));
   assert.equal(app.pointLabel("fr",1),"1 pt");
   assert.equal(app.pointLabel("fr",0),"0 pts","French keeps the form it was reviewed with");
+
+  // Every product surface must use the selector, not only the two helpers above.
+  storage.clear();
+  app.Store.savePresets([samplePreset({name:"Arabic dual",rounds:2})]);
+  app.setUiLocale("ar",false);
+  app.renderPresets(0);
+  const summaryText=descendants(document.getElementById("presetSummary")).map(node=>node.textContent).join(" ");
+  assert.match(summaryText,/مشاركان/,"the preset summary uses the participant dual");
+  assert.match(summaryText,/جولتان/,"the preset summary uses the round dual");
+
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:2,kind:"ballot"},
+    {pid:"p1",name:"Beta",color:"#4f8cf7",role:"",round:2,kind:"ballot"}
+  ];
+  const s=stateFor(turns,ps,["one","two","الترتيب: B > A","الترتيب: A > B"]);
+  s.promptLocale="ar"; s.ballots[2]=["B","A"]; s.ballots[3]=["A","B"];
+  app.setState(s);
+  assert.match(app.reviewPacketMd("RPPLURAL123"),/تصويتان/,"the review packet uses the ballot dual");
+  app.setState(null);
+  storage.clear();
+  app.setUiLocale(before||"en",false);
 });
 
 test("registered language packs have identical keys and placeholders",()=>{
@@ -298,6 +324,12 @@ test("registered language packs have identical keys and placeholders",()=>{
       if(shape.length) assert.deepEqual(shape,placeholders(app.I18N.en[family+".other"]),`${locale}: ${key}`);
     }
   }
+  // Once a locale opts in, every counted family must be complete. Omitting all
+  // optional forms from one family is still a partial catalog, not an opt-out.
+  const incompleteArabic={...app.I18N.ar};
+  for(const category of OPTIONAL) delete incompleteArabic["common.ballot."+category];
+  assert.throws(()=>app.registerLocale("ars","Arabic validation probe",incompleteArabic,"rtl"),
+    /must declare .* for common\.ballot/);
 });
 
 test("every declarative UI translation key exists in every registered catalog",()=>{
