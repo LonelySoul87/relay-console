@@ -109,7 +109,7 @@ right-to-left interface support.
 
 ### Review status
 
-- All 354 automated checks pass across the current and historical suites.
+- All 356 automated checks pass across the current and historical suites.
 - Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
   without clipping, horizontal overflow, warning, or error.
 - German and Arabic wording should receive an independent peer or fluent-human

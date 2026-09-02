@@ -254,6 +254,109 @@ test("the import preview counts participants instead of always saying participan
   }
 });
 
+test("a surface is written in one language, even when the two are set differently",()=>{
+  // The interface language and the prompt language are chosen separately. The
+  // transcript follows the interface; the prompt and the review packet follow the
+  // prompt language. A surface that reaches for the wrong one leaks the other
+  // language into it, which is exactly how the synthesis heading stayed English.
+  // Crossing the two languages makes any such leak visible as a script mismatch.
+  const ARABIC=/[\u0600-\u06ff]/g;
+  const GERMAN=/\b(Antwort|Antworten|Runde|Schritt|Rangliste|Ranglisten|Synthese|Erfasst|Weitergeleitet|Frage|Rolle|Diskussion|Zusammenfassung)\b/g;
+  const ps=[participant("p0","ChatGPT"),participant("p1","Claude")];
+  const turns=[
+    {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Claude", color:"#d97757",role:"",round:1,kind:"blind"},
+    {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:2,kind:"ballot"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  // the fixture keeps every piece of user content in Latin script, so any Arabic
+  // character in a German surface came from the catalog
+  const build=(ui,prompt)=>{
+    const st=stateFor(turns,ps,["Alpha answer","Beta answer","RANKING: B > A","Merged"]);
+    st.question="Which launch plan is best?"; st.recipe="ballot";
+    st.uiLocale=ui; st.promptLocale=prompt; st.cursor=3; st.ended=true;
+    st.ballots[2]=["B","A"];
+    return st;
+  };
+  // language names are given in their own script wherever they are reported, so
+  // they are not a leak
+  const stripNames=text=>{
+    let out=text;
+    for(const code of app.SUPPORTED_LOCALES) out=out.split(app.LOCALE_REGISTRY[code].label).join("");
+    return out;
+  };
+  const before=app.getUiLocale();
+
+  app.setUiLocale("de"); app.setPromptLocale("ar"); app.setState(build("de","ar"));
+  assert.deepEqual(stripNames(app.transcriptMd()).match(ARABIC),null,
+    "a German transcript must carry no Arabic from the catalog");
+  const arPacket=app.reviewPacketMd("RPCROSS0001");
+  assert.deepEqual(stripNames(arPacket).match(GERMAN),null,
+    "an Arabic packet must carry no German from the catalog");
+  for(let i=0;i<turns.length;i++)
+    assert.deepEqual(stripNames(app.buildPrompt(i)).match(GERMAN),null,"prompt "+i+" must be Arabic only");
+
+  app.setUiLocale("ar"); app.setPromptLocale("de"); app.setState(build("ar","de"));
+  assert.deepEqual(stripNames(app.reviewPacketMd("RPCROSS0002")).match(ARABIC),null,
+    "a German packet must carry no Arabic from the catalog");
+  assert.ok(ARABIC.test(app.transcriptMd()),"and the Arabic transcript is still Arabic");
+  for(let i=0;i<turns.length;i++)
+    assert.deepEqual(stripNames(app.buildPrompt(i)).match(ARABIC),null,"prompt "+i+" must be German only");
+
+  app.setUiLocale(before||"en"); app.setPromptLocale("en"); app.setState(null);
+});
+
+test("no internal name reaches a reader",()=>{
+  // Recipe keys, turn kinds and format keys are identifiers, not words. The
+  // synthesis heading reached readers as a stored English literal, so every
+  // generated surface is checked against the whole internal vocabulary.
+  const internal=[...new Set([
+    ...Object.keys(app.RECIPES),
+    "markdown","plain","block","blind","debate","revise","ballot","synth",
+    "roleKey","nameKey","hintKey","promptLocale","uiLocale","formatVersion"
+  ])];
+  // The boundary has to be letter aware, or synth matches inside Synthese and
+  // ballot inside a translated word. A letter test written as a regex literal
+  // keeps its escapes, which the same class written inside a string would lose.
+  const isWordChar=c=>c!==undefined&&/[\p{L}\p{N}]/u.test(c);
+  const leaked=text=>{
+    const found=new Set();
+    for(const word of internal){
+      const scan=new RegExp(word,"g");
+      let hit;
+      while((hit=scan.exec(text))!==null){
+        const before=text[hit.index-1], after=text[hit.index+word.length];
+        if(!isWordChar(before)&&!isWordChar(after)) found.add(word);
+      }
+    }
+    return [...found];
+  };
+  const ps=[participant("p0","ChatGPT"),participant("p1","Claude")];
+  const turns=[
+    {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Claude", color:"#d97757",role:"",round:1,kind:"debate"},
+    {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:2,kind:"revise"},
+    {pid:"p1",name:"Claude", color:"#d97757",role:"",round:2,kind:"ballot"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  const before=app.getUiLocale();
+  // the identifiers are English words, so only a translated surface can tell a
+  // leaked key apart from ordinary vocabulary
+  for(const locale of app.SUPPORTED_LOCALES.filter(c=>c!=="en")){
+    const st=stateFor(turns,ps,["A","B","C","RANKING: B > A > C > D","D"]);
+    st.recipe="ballot"; st.uiLocale=locale; st.promptLocale=locale; st.cursor=4; st.ended=true;
+    app.setUiLocale(locale); app.setPromptLocale(locale); app.setState(st);
+    const surfaces={transcript:app.transcriptMd(),packet:app.reviewPacketMd("RPNAME00001")};
+    for(let i=0;i<turns.length;i++) surfaces["prompt"+i]=app.buildPrompt(i);
+    for(const [name,text] of Object.entries(surfaces)){
+      // the quoting fences deliberately keep English keywords
+      const body=text.split(/\n/).filter(l=>!/\[(BEGIN|END) (QUOTED )?(ANSWER|REVIEW MATERIAL)/.test(l)).join("\n");
+      assert.deepEqual(leaked(body),[],locale+" "+name+" carries an internal name");
+    }
+  }
+  app.setUiLocale(before||"en"); app.setPromptLocale("en"); app.setState(null);
+});
+
 test("a review packet names the synthesis turn in the language it is written in",()=>{
   // A synthesis turn with no chatbot assigned carries the literal name the plan
   // builder gave it. The transcript already replaced that with the catalog label,
