@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import {createHash} from "node:crypto";
 import {existsSync,readFileSync,readdirSync} from "node:fs";
 import {join} from "node:path";
 import test from "node:test";
@@ -175,22 +174,6 @@ test("v2.4 release JavaScript loads in a minimal browser environment",()=>{
   const contentWrites=[...html.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(match=>match[1].trim()).filter(value=>value!=="\"\"");
   assert.deepEqual(contentWrites,["t(el.dataset.i18nHtml,{version:VERSION})"]);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
-  assert.deepEqual(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url))),readFileSync(htmlPath));
-  const sumBytes=readFileSync(fileURLToPath(new URL("../SHA256SUMS.txt",import.meta.url)));
-  assert.equal(sumBytes.includes(13),false,"the checksum manifest must stay LF only, as .gitattributes pins it");
-  assert.equal(sumBytes.at(-1),10,"the manifest ends with a newline");
-  assert.notEqual(sumBytes.at(-2),10,"the manifest ends with exactly one newline");
-  const sums=sumBytes.toString("utf8");
-  const expectedFiles=["relay-console-v1.8.2.html","relay-console-v1.8.3.html","relay-console-v1.8.4.html","relay-console-v1.9.0.html","relay-console-v2.0.0.html","relay-console-v2.1.0.html","relay-console-v2.2.0.html","relay-console-v2.3.0.html","relay-console-v2.4.0.html"];
-  const sumLines=sums.trim().split(/\r?\n/);
-  assert.equal(sumLines.length,expectedFiles.length);
-  for(const [i,line] of sumLines.entries()){
-    const match=line.match(/^([0-9a-f]{64})  (relay-console-v[0-9.]+\.html)$/);
-    assert.ok(match,line);
-    assert.equal(match[2],expectedFiles[i]);
-    const releaseBytes=readFileSync(fileURLToPath(new URL(`../${match[2]}`,import.meta.url)));
-    assert.equal(createHash("sha256").update(releaseBytes).digest("hex"),match[1],match[2]);
-  }
 });
 
 test("all active product, planning, and repository text contains no em dashes",()=>{

@@ -1,8 +1,8 @@
 # Changelog
 
-## v2.5.0 (in development)
+## v2.5.0
 
-Language expansion focused on complete German and Arabic workflows, including
+Feature release focused on complete German and Arabic workflows, including
 right-to-left interface support.
 
 ### Added
