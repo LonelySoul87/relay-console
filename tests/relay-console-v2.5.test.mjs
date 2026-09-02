@@ -340,6 +340,15 @@ test("no internal name reaches a reader",()=>{
     return [...found];
   };
   for(const key of Object.keys(app.I18N.en)) assert.ok(internal.includes(key),key+" must be part of the internal-name guard");
+  // a token that a language uses as an ordinary word is vocabulary, not a key
+  const vocabulary=locale=>new Set(Object.values(app.I18N[locale])
+    .flatMap(value=>String(value).toLocaleLowerCase("de").match(/\p{L}+/gu)||[]));
+  const spoken={};
+  for(const locale of app.SUPPORTED_LOCALES) spoken[locale]=vocabulary(locale);
+  assert.equal(spoken.de.has("blind"),true,"German writes blind as a word");
+  assert.equal(spoken.en.has("ballot"),true,"English writes ballot as a word");
+  assert.equal(spoken.ar.has("packet.configuration"),false,"a dotted key is never a single word");
+  const leakedIn=(text,locale)=>leaked(text).filter(word=>!spoken[locale].has(word.toLocaleLowerCase("de")));
   const ps=[participant("p0","ChatGPT"),participant("p1","Claude")];
   const turns=[
     {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:1,kind:"blind"},
@@ -349,18 +358,33 @@ test("no internal name reaches a reader",()=>{
     {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
   ];
   const before=app.getUiLocale();
-  // the identifiers are English words, so only a translated surface can tell a
-  // leaked key apart from ordinary vocabulary
-  for(const locale of app.SUPPORTED_LOCALES.filter(c=>c!=="en")){
+  for(const locale of app.SUPPORTED_LOCALES){
     const st=stateFor(turns,ps,["A","B","C","RANKING: B > A > C > D","D"]);
     st.recipe="ballot"; st.uiLocale=locale; st.promptLocale=locale; st.cursor=4; st.ended=true;
     app.setUiLocale(locale); app.setPromptLocale(locale); app.setState(st);
     const surfaces={transcript:app.transcriptMd(),packet:app.reviewPacketMd("RPNAME00001")};
     for(let i=0;i<turns.length;i++) surfaces["prompt"+i]=app.buildPrompt(i);
+    // the lane, the transcript list and the ballot box are rendered rather than
+    // written out, so the export checks never see them. The synthesis heading was
+    // exactly this shape of miss, on a surface no test was reading.
+    app.renderLane(); app.renderTranscript(); app.renderBallotBox();
+    const seen=[];
+    for(const id of ["lane","transcript","ballotBox","ballotHead","ballotRanks"]){
+      const root=document.getElementById(id);
+      for(const node of [root,...descendants(root)]){
+        if(node.textContent) seen.push(node.textContent);
+        for(const attribute of ["aria-label","title","placeholder"]){
+          const value=node.getAttribute&&node.getAttribute(attribute);
+          if(value) seen.push(value);
+        }
+      }
+    }
+    surfaces["rendered panels"]=seen.join("\n");
+    assert.ok(surfaces["rendered panels"].length>80,locale+": the panels rendered something to read");
     for(const [name,text] of Object.entries(surfaces)){
       // the quoting fences deliberately keep English keywords
       const body=text.split(/\n/).filter(l=>!/\[(BEGIN|END) (QUOTED )?(ANSWER|REVIEW MATERIAL)/.test(l)).join("\n");
-      assert.deepEqual(leaked(body),[],locale+" "+name+" carries an internal name");
+      assert.deepEqual(leakedIn(body,locale),[],locale+" "+name+" carries an internal name");
     }
   }
   app.setUiLocale(before||"en"); app.setPromptLocale("en"); app.setState(null);
