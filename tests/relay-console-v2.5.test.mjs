@@ -260,8 +260,7 @@ test("a surface is written in one language, even when the two are set differentl
   // prompt language. A surface that reaches for the wrong one leaks the other
   // language into it, which is exactly how the synthesis heading stayed English.
   // Crossing the two languages makes any such leak visible as a script mismatch.
-  const ARABIC=/[\u0600-\u06ff]/g;
-  const GERMAN=/\b(Antwort|Antworten|Runde|Schritt|Rangliste|Ranglisten|Synthese|Erfasst|Weitergeleitet|Frage|Rolle|Diskussion|Zusammenfassung)\b/g;
+  const ARABIC=/[\u0600-\u06ff]/;
   const ps=[participant("p0","ChatGPT"),participant("p1","Claude")];
   const turns=[
     {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:1,kind:"blind"},
@@ -285,21 +284,29 @@ test("a surface is written in one language, even when the two are set differentl
     for(const code of app.SUPPORTED_LOCALES) out=out.split(app.LOCALE_REGISTRY[code].label).join("");
     return out;
   };
+  const words=text=>String(text).toLocaleLowerCase("de").match(/\p{L}+/gu)||[];
+  const catalogWords=locale=>new Set(Object.values(app.I18N[locale]).flatMap(words));
+  const deWords=catalogWords("de"), arWords=catalogWords("ar"), enWords=catalogWords("en");
+  const germanOnly=new Set([...deWords].filter(word=>word.length>=3&&!arWords.has(word)&&!enWords.has(word)));
+  const germanLeaks=text=>[...new Set(words(stripNames(text)).filter(word=>germanOnly.has(word)))];
+  assert.ok(germanOnly.has("konfiguration"),"the derived set includes German catalog vocabulary outside a hand-picked list");
   const before=app.getUiLocale();
 
   app.setUiLocale("de"); app.setPromptLocale("ar"); app.setState(build("de","ar"));
   assert.deepEqual(stripNames(app.transcriptMd()).match(ARABIC),null,
     "a German transcript must carry no Arabic from the catalog");
   const arPacket=app.reviewPacketMd("RPCROSS0001");
-  assert.deepEqual(stripNames(arPacket).match(GERMAN),null,
+  assert.deepEqual(germanLeaks(arPacket),[],
     "an Arabic packet must carry no German from the catalog");
   for(let i=0;i<turns.length;i++)
-    assert.deepEqual(stripNames(app.buildPrompt(i)).match(GERMAN),null,"prompt "+i+" must be Arabic only");
+    assert.deepEqual(germanLeaks(app.buildPrompt(i)),[],"prompt "+i+" must be Arabic only");
 
   app.setUiLocale("ar"); app.setPromptLocale("de"); app.setState(build("ar","de"));
   assert.deepEqual(stripNames(app.reviewPacketMd("RPCROSS0002")).match(ARABIC),null,
     "a German packet must carry no Arabic from the catalog");
-  assert.ok(ARABIC.test(app.transcriptMd()),"and the Arabic transcript is still Arabic");
+  const arabicTranscript=stripNames(app.transcriptMd());
+  assert.deepEqual(germanLeaks(arabicTranscript),[],"an Arabic transcript must carry no German from the catalog");
+  assert.ok(ARABIC.test(arabicTranscript),"and the Arabic transcript is still Arabic");
   for(let i=0;i<turns.length;i++)
     assert.deepEqual(stripNames(app.buildPrompt(i)).match(ARABIC),null,"prompt "+i+" must be German only");
 
@@ -312,6 +319,7 @@ test("no internal name reaches a reader",()=>{
   // generated surface is checked against the whole internal vocabulary.
   const internal=[...new Set([
     ...Object.keys(app.RECIPES),
+    ...Object.keys(app.I18N.en),
     "markdown","plain","block","blind","debate","revise","ballot","synth",
     "roleKey","nameKey","hintKey","promptLocale","uiLocale","formatVersion"
   ])];
@@ -322,15 +330,16 @@ test("no internal name reaches a reader",()=>{
   const leaked=text=>{
     const found=new Set();
     for(const word of internal){
-      const scan=new RegExp(word,"g");
-      let hit;
-      while((hit=scan.exec(text))!==null){
-        const before=text[hit.index-1], after=text[hit.index+word.length];
+      let at=text.indexOf(word);
+      while(at!==-1){
+        const before=text[at-1], after=text[at+word.length];
         if(!isWordChar(before)&&!isWordChar(after)) found.add(word);
+        at=text.indexOf(word,at+Math.max(1,word.length));
       }
     }
     return [...found];
   };
+  for(const key of Object.keys(app.I18N.en)) assert.ok(internal.includes(key),key+" must be part of the internal-name guard");
   const ps=[participant("p0","ChatGPT"),participant("p1","Claude")];
   const turns=[
     {pid:"p0",name:"ChatGPT",color:"#10a37f",role:"",round:1,kind:"blind"},
