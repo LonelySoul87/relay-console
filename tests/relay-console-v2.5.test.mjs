@@ -273,7 +273,7 @@ test("a review packet names the synthesis turn in the language it is written in"
     s.promptLocale=prompt;
     app.setState(s);
     const packet=app.reviewPacketMd("RPSYNTH0001");
-    assert.ok(packet.includes(expected),prompt+" packet must name it "+expected);
+    assert.ok(packet.includes(`### 3. ${expected}:`),prompt+" packet must use "+expected+" in the synthesis heading");
     assert.doesNotMatch(packet,/### 3\. Synthesis:/,prompt+" packet must not carry the stored English name");
   }
 
@@ -282,7 +282,7 @@ test("a review packet names the synthesis turn in the language it is written in"
   app.setUiLocale("en");
   s.promptLocale="ar";
   app.setState(s);
-  assert.ok(app.reviewPacketMd("RPSYNTH0002").includes("\u0627\u0644\u062e\u0644\u0627\u0635\u0629"),
+  assert.ok(app.reviewPacketMd("RPSYNTH0002").includes("### 3. \u0627\u0644\u062e\u0644\u0627\u0635\u0629:"),
     "an English interface still writes an Arabic packet heading");
   app.setUiLocale(before||"en");
 
