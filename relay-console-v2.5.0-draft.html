@@ -46,14 +46,14 @@
     :root{
       --bg:#f3f1ec; --bg-2:#efece5; --panel:#ffffff; --panel-2:#f4f1ea; --line:#e4dfd4; --line-soft:#ece8df;
       --text:#1b1822; --muted:#6c6678;
-      --signal:#f0a01f; --signal-2:#ffd98a; --accent-text:#9c5d06; --btn-ink:#2a1c02;
-      --teal:#177f74;
+      --signal:#f0a01f; --signal-2:#ffd98a; --accent-text:#995b06; --btn-ink:#2a1c02;
+      --teal:#15766c;
       --prompt-bg:#faf8f2; --prompt-text:#2b3040;
       --entry-text:#2a2f3a; --code-text:#5b6172;
       --focus-ring:rgba(156,93,6,.2); --node-glow:rgba(240,160,31,.4);
       --card-shadow:0 1px 2px rgba(28,24,18,.05), 0 16px 36px -24px rgba(28,24,18,.4);
       --hero-glow:rgba(240,160,31,.16);
-      --ok:#2f9d72; --danger:#c25555;
+      --ok:#247757; --danger:#ac4b4b;
     }
   }
   /* manual theme override: wins over the system preference */
@@ -177,7 +177,7 @@
   .starter:hover{border-color:var(--signal);transform:translateY(-1px);box-shadow:0 8px 22px -16px var(--node-glow)}
   .starter strong{font-size:14px;color:var(--accent-text)}
   .starter span{font-size:12.5px;line-height:1.45;color:var(--muted)}
-  .starterstatus{margin:12px 0 0;color:var(--success);font-size:12.5px}
+  .starterstatus{margin:12px 0 0;color:var(--ok);font-size:12.5px}
   @media (max-width:760px){.startergrid{grid-template-columns:1fr}.starter{min-height:0}}
 
   /* participants */
@@ -339,7 +339,7 @@
   .filtertitle{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
   .filtergrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .filtergrid label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
-  .filtergrid select,.filtergrid input{display:block;width:100%;margin-top:5px;padding:7px 9px;font-family:var(--sans);font-size:12.5px;letter-spacing:0;text-transform:none}
+  .filtergrid select,.filtergrid input{display:block;width:100%;margin-top:5px;padding:7px 9px;font-family:var(--body);font-size:12.5px;letter-spacing:0;text-transform:none}
   .filtergrid .filtersearch{grid-column:1/-1}
   .filterstatus{min-height:1.4em;margin:8px 0 0;font-size:11.5px;color:var(--muted)}
   @media (max-width:430px){.filtergrid{grid-template-columns:1fr}.filtergrid .filtersearch{grid-column:auto}}

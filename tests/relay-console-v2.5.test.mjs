@@ -225,13 +225,38 @@ test("light and dark color tokens keep normal text at accessible contrast",()=>{
     const x=luminance(a),y=luminance(b);
     return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);
   };
-  const pairs=[["--text","--bg"],["--text","--panel"],["--muted","--bg"],["--muted","--panel"],["--muted","--bg-2"],["--accent-text","--bg"],["--accent-text","--panel"],["--entry-text","--bg-2"],["--code-text","--prompt-bg"],["--prompt-text","--prompt-bg"]];
+  // The list of text colours is read from the stylesheet rather than written out
+  // here, so a colour introduced later is covered without anyone remembering to
+  // add it. A hand-written list had left the warning colour, the peer-ranking
+  // colour and the success colour unchecked, and all three were failing.
+  const style=html.slice(html.indexOf("<style>"),html.indexOf("</style>"));
+  const painted=[...new Set([...style.matchAll(/(?:^|[;{\s])color\s*:\s*var\((--[\w-]+)\)/g)].map(match=>match[1]))];
+  assert.ok(painted.length>=8,"the stylesheet's text colours were found, got "+painted.length);
+  for(const token of ["--danger","--ok","--teal","--accent-text","--muted"])
+    assert.ok(painted.includes(token),token+" is painted as text and must be checked");
+  // Every surface a reader can meet text on. The button ink is the one colour
+  // never painted on these: it sits on the accent gradient, so it is measured
+  // against that instead.
+  const surfaces=["--bg","--bg-2","--panel","--prompt-bg"];
+  const onAccent={"--btn-ink":["--signal","--signal-2"]};
   for(const [theme,block] of Object.entries(blocks)){
     const tokens=readTokens(block);
-    for(const [foreground,background] of pairs){
-      assert.ok(contrast(tokens[foreground],tokens[background])>=4.5,`${theme} ${foreground} on ${background} meets 4.5 to 1`);
+    for(const token of painted){
+      const backgrounds=onAccent[token]||surfaces;
+      for(const background of backgrounds){
+        const value=tokens[token],behind=tokens[background];
+        if(!value||!behind) continue;   // a token the theme does not redefine
+        assert.ok(contrast(value,behind)>=4.5,
+          `${theme} ${token} on ${background} meets 4.5 to 1, got ${contrast(value,behind).toFixed(2)}`);
+      }
     }
   }
+  // every colour the stylesheet asks for has to exist, or the text silently
+  // falls back to whatever it inherits
+  const requested=[...new Set([...style.matchAll(/var\((--[\w-]+)\)/g)].map(match=>match[1]))];
+  const defined=new Set([...Object.keys(readTokens(blocks.dark)),...Object.keys(readTokens(blocks.light)),
+    ...[...style.matchAll(/(--[\w-]+)\s*:/g)].map(match=>match[1])]);
+  for(const token of requested) assert.ok(defined.has(token),token+" is used but never defined");
 });
 
 test("all active product, planning, and repository text contains no em dashes",()=>{
