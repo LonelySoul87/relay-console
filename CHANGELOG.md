@@ -118,17 +118,18 @@ right-to-left interface support.
   restored. Recovery, privacy, plan, shortcut, and prompt wording received a
   focused grammar and clarity pass.
 
-- Corrected four light-theme colors that failed the 4.5 to 1 contrast minimum
-  for normal text: the warning color, the success color, the peer-ranking color,
-  and the link color on raised surfaces. Measured in a browser, the worst was the
-  warning color at 3.77 to 1 behind text such as a failed save or a stale answer.
+- Corrected four light-theme colors, in both automatic and manually selected
+  light mode, that failed the 4.5 to 1 contrast minimum for normal text: the
+  warning color, the success color, the peer-ranking color, and the link color
+  on raised surfaces. Measured in a browser, the worst was the warning color at
+  3.77 to 1 behind text such as a failed save or a stale answer.
 - Fixed two colors that were requested but never defined. The starter
   confirmation asked for a success color that does not exist and the transcript
   filter controls asked for a font that does not exist, so both silently fell
   back to whatever they inherited.
 - The contrast check now reads the list of text colors out of the stylesheet
-  instead of naming them by hand, so a color added later is covered without
-  anyone remembering, and every color the stylesheet asks for must exist.
+  instead of naming them by hand, covers the automatic and manual theme blocks,
+  and requires every color requested by the stylesheet to exist.
 
 ### Review status
 

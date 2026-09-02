@@ -211,9 +211,16 @@ test("public feedback is discoverable, localized, and keeps private reports out 
 });
 
 test("light and dark color tokens keep normal text at accessible contrast",()=>{
+  const block=(pattern,name)=>{
+    const match=html.match(pattern);
+    assert.ok(match,name+" theme block exists");
+    return match[1];
+  };
   const blocks={
-    dark:html.match(/  :root\{([\s\S]*?)\n  \}/)[1],
-    light:html.match(/@media \(prefers-color-scheme: light\)\{\s*:root\{([\s\S]*?)\n    \}/)[1]
+    systemDark:block(/  :root\{([\s\S]*?)\n  \}/,"system dark"),
+    systemLight:block(/@media \(prefers-color-scheme: light\)\{\s*:root\{([\s\S]*?)\n    \}/,"system light"),
+    manualDark:block(/:root\[data-theme="dark"\]\{([\s\S]*?)\n  \}/,"manual dark"),
+    manualLight:block(/:root\[data-theme="light"\]\{([\s\S]*?)\n  \}/,"manual light")
   };
   const readTokens=block=>Object.fromEntries([...block.matchAll(/(--[\w-]+):(#(?:[0-9a-fA-F]{6}))/g)].map(match=>[match[1],match[2]]));
   const rgb=hex=>[1,3,5].map(at=>Number.parseInt(hex.slice(at,at+2),16));
@@ -254,8 +261,8 @@ test("light and dark color tokens keep normal text at accessible contrast",()=>{
   // every colour the stylesheet asks for has to exist, or the text silently
   // falls back to whatever it inherits
   const requested=[...new Set([...style.matchAll(/var\((--[\w-]+)\)/g)].map(match=>match[1]))];
-  const defined=new Set([...Object.keys(readTokens(blocks.dark)),...Object.keys(readTokens(blocks.light)),
-    ...[...style.matchAll(/(--[\w-]+)\s*:/g)].map(match=>match[1])]);
+  const defined=new Set(Object.values(blocks).flatMap(theme=>Object.keys(readTokens(theme))).concat(
+    [...style.matchAll(/(--[\w-]+)\s*:/g)].map(match=>match[1])));
   for(const token of requested) assert.ok(defined.has(token),token+" is used but never defined");
 });
 
