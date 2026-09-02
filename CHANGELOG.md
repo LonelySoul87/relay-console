@@ -100,9 +100,16 @@ right-to-left interface support.
   holding one participant read as "1 participants" in English, "1 participantes"
   in Spanish, and the plural at every count in Arabic.
 
+- A review packet now names an unassigned synthesis turn from the catalog. The
+  turn carries the literal name the plan builder gave it, which the transcript
+  already replaced with the localized label, but the packet printed the stored
+  name, so a German or Arabic packet carried an English heading. The packet is
+  written in the prompt language, which is not always the interface language, so
+  the lookup takes the locale rather than assuming the interface one.
+
 ### Review status
 
-- All 353 automated checks pass across the current and historical suites.
+- All 354 automated checks pass across the current and historical suites.
 - Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
   without clipping, horizontal overflow, warning, or error.
 - German and Arabic wording should receive an independent peer or fluent-human

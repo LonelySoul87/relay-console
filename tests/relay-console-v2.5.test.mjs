@@ -254,6 +254,59 @@ test("the import preview counts participants instead of always saying participan
   }
 });
 
+test("a review packet names the synthesis turn in the language it is written in",()=>{
+  // A synthesis turn with no chatbot assigned carries the literal name the plan
+  // builder gave it. The transcript already replaced that with the catalog label,
+  // but the packet printed the stored name, so a German or Arabic packet carried
+  // an English heading. The packet is written in the prompt language, which is not
+  // always the interface language.
+  const ps=[participant("p0","Alpha"),participant("p1","Beta")];
+  const turns=[
+    {pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:1,kind:"blind"},
+    {pid:"p1",name:"Beta", color:"#4f8cf7",role:"",round:1,kind:"blind"},
+    {pid:null,name:"Synthesis",color:"#f2a541",role:"",round:0,kind:"synth"}
+  ];
+  const s=stateFor(turns,ps,["one","two","merged"]);
+  s.cursor=2; s.ended=true;
+
+  for(const [prompt,expected] of [["de","Synthese"],["ar","\u0627\u0644\u062e\u0644\u0627\u0635\u0629"],["fr","Synth\u00e8se"]]){
+    s.promptLocale=prompt;
+    app.setState(s);
+    const packet=app.reviewPacketMd("RPSYNTH0001");
+    assert.ok(packet.includes(expected),prompt+" packet must name it "+expected);
+    assert.doesNotMatch(packet,/### 3\. Synthesis:/,prompt+" packet must not carry the stored English name");
+  }
+
+  // the interface language does not decide it: the packet follows the prompt language
+  const before=app.getUiLocale();
+  app.setUiLocale("en");
+  s.promptLocale="ar";
+  app.setState(s);
+  assert.ok(app.reviewPacketMd("RPSYNTH0002").includes("\u0627\u0644\u062e\u0644\u0627\u0635\u0629"),
+    "an English interface still writes an Arabic packet heading");
+  app.setUiLocale(before||"en");
+
+  // the transcript names it from the catalog as well, in the interface language
+  const uiBefore=app.getUiLocale();
+  s.promptLocale="en";
+  app.setState(s);
+  app.setUiLocale("de");
+  assert.match(app.transcriptMd(),/## Synthese:/,"the transcript heading is localized");
+  app.setUiLocale("ar");
+  assert.ok(app.transcriptMd().includes("\u0627\u0644\u062e\u0644\u0627\u0635\u0629"),"and in Arabic");
+  assert.doesNotMatch(app.transcriptMd(),/## Synthesis:/,"never the stored English name");
+  app.setUiLocale(uiBefore||"en");
+
+  // a synthesis turn that was assigned to a chatbot keeps that chatbot name
+  const named=stateFor([{pid:"p0",name:"Alpha",color:"#10a37f",role:"",round:0,kind:"synth"}],ps,["merged"]);
+  named.promptLocale="ar"; named.cursor=0; named.ended=true;
+  app.setState(named);
+  const assigned=app.reviewPacketMd("RPSYNTH0003");
+  assert.ok(assigned.includes("### 1. Alpha:"),"an assigned synthesis keeps its chatbot name in the heading");
+  assert.equal(assigned.includes("### 1. \u0627\u0644\u062e\u0644\u0627\u0635\u0629:"),false,"and is not replaced by the catalog label");
+  app.setState(null);
+});
+
 test("no counted surface picks its own singular or plural",()=>{
   // Three surfaces were fixed after each was found choosing between one and other
   // by hand: the preset participant summary, the preset round summary, and the
@@ -312,6 +365,11 @@ test("the page still opens where platform plural support is missing or incomplet
     "no selector":{PluralRules:class{
       constructor(locale){this.locale=locale;}
       resolvedOptions(){return {locale:this.locale,pluralCategories:["one","other"],type:"cardinal"};}
+    }},
+    "empty category list":{PluralRules:class{
+      constructor(locale){this.locale=locale;}
+      resolvedOptions(){return {locale:this.locale,pluralCategories:[],type:"cardinal"};}
+      select(){return "other";}
     }}
   };
   for(const [label,impl] of Object.entries(runtimes)){
@@ -321,7 +379,8 @@ test("the page still opens where platform plural support is missing or incomplet
     assert.equal(booted.app.countedMessage("ar","common.answer",2),ANSWER_TWO,label);
     assert.equal(booted.app.countedMessage("ar","common.answer",11),"11 \u0625\u062c\u0627\u0628\u0629",label);
     assert.equal(booted.app.countedMessage("de","common.answer",2),"2 Antworten",label+": German is unaffected");
-    if(label==="no category list"||label==="no selector") assert.equal(booted.app.pluralRuleFor("qaa"),null,label+": incomplete platform data is refused");
+    if(["no category list","no selector","empty category list"].includes(label))
+      assert.equal(booted.app.pluralRuleFor("qaa"),null,label+": incomplete platform data is refused");
   }
 });
 
@@ -346,16 +405,18 @@ test("a language the platform cannot resolve is left alone rather than refused",
   assert.equal(app.pluralRuleFor("qaa"),null,"no rule is invented for an unknown language");
   assert.equal(app.pluralSuffix("qaa","common.answer",2),"other");
   assert.equal(app.pluralSuffix("qaa","common.answer",1),"one");
-  // Registering such a pack, extra forms and all, must not throw. This runs in a
-  // throwaway context so the probe language never joins the real registry.
-  const probe=bootWith(Intl);
-  assert.equal(probe.loaded,true);
-  const pack={...probe.app.I18N.en,"common.answer.two":"two answers","common.answer.zero":"no answers",
-    "common.answer.few":"{count} answers","common.answer.many":"{count} answers"};
-  assert.doesNotThrow(()=>probe.app.registerLocale("qab","Probe",pack));
-  assert.equal(probe.app.pluralSuffix("qab","common.answer",2),"other","and it falls back to the pair");
-  // the real registry is untouched
+  // The set of languages is fixed once the file has loaded. The registry is
+  // frozen, and the script is not in strict mode, so a later registerLocale call
+  // reports nothing and changes nothing. An earlier version of this test tried to
+  // register a probe language here and read the silent no-op as proof that the
+  // validator had accepted it, which proved nothing at all.
+  assert.equal(Object.isFrozen(app.LOCALE_REGISTRY),true,"the registry is sealed after load");
+  const before=Object.keys(app.LOCALE_REGISTRY).sort();
+  app.registerLocale("qab","Probe",{...app.I18N.en});
+  assert.deepEqual(Object.keys(app.LOCALE_REGISTRY).sort(),before,"a later registration adds nothing");
   assert.deepEqual(Array.from(app.SUPPORTED_LOCALES),["en","fr","es","de","ar"]);
+  // so every language that can ever be selected is one of the five validated at load
+  for(const code of app.SUPPORTED_LOCALES) assert.ok(app.LOCALE_REGISTRY[code],code);
 });
 
 test("a language spells counted nouns with the forms it actually distinguishes",()=>{

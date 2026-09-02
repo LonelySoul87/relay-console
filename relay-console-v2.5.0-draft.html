@@ -1998,7 +1998,8 @@ function turnTarget(t){
   return state.participants.find(x=>x.id===t.pid)||null;
 }
 const KIND_LAP={debate:"lane.debate",blind:"lane.blind",revise:"lane.revise",ballot:"lane.ballot",synth:"lane.synth"};
-function displayTurnName(turn){ return turn.kind==="synth"&&!turn.pid?t("stats.synthesis"):turn.name; }
+function turnNameIn(turn,locale){ return turn.kind==="synth"&&!turn.pid?tr(locale,"stats.synthesis"):turn.name; }
+function displayTurnName(turn){ return turnNameIn(turn,uiLocale); }
 function turnTypeLabel(kind){ return tr(uiLocale,STEP_KINDS[kind]||STEP_KINDS.debate); }
 let laneStateRef=null, laneReachThrough=-1;
 function syncLaneReach(){
@@ -2464,7 +2465,7 @@ function reviewPacketMd(markerOverride){
     const forwarded=f==null?captured:cleanText(f).trim();
     const status=f==null?tr(locale,"transcript.sentFull"):forwarded?tr(locale,"transcript.trimmed"):tr(locale,"transcript.excluded");
     const forwardedDisplay=f==null?tr(locale,"packet.sameAsCaptured"):(forwarded?safe(forwarded):tr(locale,"packet.none"));
-    material+=`### ${i+1}. ${safe(turn.name)}: ${kind}\n\n**${tr(locale,"packet.captured")}**\n\n${safe(captured)}\n\n**${tr(locale,"packet.forwarded")} (${status})**\n\n${forwardedDisplay}\n\n`;
+    material+=`### ${i+1}. ${safe(turnNameIn(turn,locale))}: ${kind}\n\n**${tr(locale,"packet.captured")}**\n\n${safe(captured)}\n\n**${tr(locale,"packet.forwarded")} (${status})**\n\n${forwardedDisplay}\n\n`;
     const notes=[];
     if(state.stale&&state.stale[i])notes.push(tr(locale,"transcript.stale"));
     if(state.review&&state.review[i])notes.push(tr(locale,"transcript.review"));
