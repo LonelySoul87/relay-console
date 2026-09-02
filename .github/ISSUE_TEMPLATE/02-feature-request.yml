@@ -1,0 +1,59 @@
+name: Feature request
+description: Suggest an improvement to Relay Console.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement.
+
+        Relay Console must remain a private, offline, dependency-free, single-file tool. GitHub issues are public, so do not include private relay content.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the workflow difficulty without including private questions or answers.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like Relay Console to do?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Relay workflow
+        - Participants and presets
+        - Transcript and exports
+        - Languages and right-to-left layout
+        - Accessibility and input methods
+        - Privacy and local storage
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: Optional. Explain what you currently do instead.
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy and offline impact
+      description: Optional. Note any effect on the single-file, no-backend design.
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues for a similar request.
+          required: true
+        - label: This request contains no private relay content.
+          required: true

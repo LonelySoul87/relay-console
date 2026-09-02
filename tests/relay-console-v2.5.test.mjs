@@ -8,6 +8,9 @@ import {fileURLToPath} from "node:url";
 
 const htmlPath=fileURLToPath(new URL("../relay-console-v2.5.0-draft.html",import.meta.url));
 const html=readFileSync(htmlPath,"utf8");
+const bugForm=readFileSync(fileURLToPath(new URL("../.github/ISSUE_TEMPLATE/01-bug-report.yml",import.meta.url)),"utf8");
+const featureForm=readFileSync(fileURLToPath(new URL("../.github/ISSUE_TEMPLATE/02-feature-request.yml",import.meta.url)),"utf8");
+const issueConfig=readFileSync(fileURLToPath(new URL("../.github/ISSUE_TEMPLATE/config.yml",import.meta.url)),"utf8");
 const scriptStart=html.indexOf("<script>")+8;
 const scriptEnd=html.lastIndexOf("</script>");
 assert.ok(scriptStart>=8&&scriptEnd>scriptStart,"embedded application script is present");
@@ -177,6 +180,51 @@ test("v2.5 draft JavaScript loads in a minimal browser environment",()=>{
   assert.deepEqual(contentWrites,["t(el.dataset.i18nHtml,{version:VERSION})"]);
   assert.match(html,/#launchBtn\[data-open="true"\]::after/);
   assert.deepEqual(readFileSync(fileURLToPath(new URL("../index.html",import.meta.url))),readFileSync(fileURLToPath(new URL("../relay-console-v2.4.0.html",import.meta.url))));
+});
+
+test("public feedback is discoverable, localized, and keeps private reports out of issues",()=>{
+  const chooser="https://github.com/LonelySoul87/relay-console/issues/new/choose";
+  assert.match(html,new RegExp(`<a href="${chooser.replaceAll("/","\\/")}" target="_blank" rel="noopener noreferrer" data-i18n="footer\\.feedback">`));
+  assert.match(html,/\.feedback a\{[^}]*min-height:24px/);
+  for(const locale of ["en","fr","es","de","ar"]){
+    assert.ok(app.I18N[locale]["footer.feedback"].trim(),`${locale} names the feedback action`);
+    assert.ok(app.I18N[locale]["footer.feedbackPrivacy"].trim(),`${locale} warns that issues are public`);
+  }
+  assert.match(bugForm,/^name: Bug report$/m);
+  assert.match(bugForm,/id: steps/);
+  assert.match(bugForm,/id: interface_language/);
+  assert.match(bugForm,/id: input_method/);
+  assert.match(bugForm,/contains no private questions, answers, session files, or provider conversations/);
+  assert.match(featureForm,/^name: Feature request$/m);
+  assert.match(featureForm,/id: privacy/);
+  assert.match(featureForm,/private, offline, dependency-free, single-file tool/);
+  assert.match(issueConfig,/^blank_issues_enabled: false$/m);
+  assert.match(issueConfig,/SECURITY\.md/);
+  assert.match(issueConfig,/Do not disclose suspected security or privacy vulnerabilities in a public issue/);
+});
+
+test("light and dark color tokens keep normal text at accessible contrast",()=>{
+  const blocks={
+    dark:html.match(/  :root\{([\s\S]*?)\n  \}/)[1],
+    light:html.match(/@media \(prefers-color-scheme: light\)\{\s*:root\{([\s\S]*?)\n    \}/)[1]
+  };
+  const readTokens=block=>Object.fromEntries([...block.matchAll(/(--[\w-]+):(#(?:[0-9a-fA-F]{6}))/g)].map(match=>[match[1],match[2]]));
+  const rgb=hex=>[1,3,5].map(at=>Number.parseInt(hex.slice(at,at+2),16));
+  const luminance=hex=>{
+    const channels=rgb(hex).map(value=>value/255).map(value=>value<=0.04045?value/12.92:Math.pow((value+0.055)/1.055,2.4));
+    return 0.2126*channels[0]+0.7152*channels[1]+0.0722*channels[2];
+  };
+  const contrast=(a,b)=>{
+    const x=luminance(a),y=luminance(b);
+    return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);
+  };
+  const pairs=[["--text","--bg"],["--text","--panel"],["--muted","--bg"],["--muted","--panel"],["--muted","--bg-2"],["--accent-text","--bg"],["--accent-text","--panel"],["--entry-text","--bg-2"],["--code-text","--prompt-bg"],["--prompt-text","--prompt-bg"]];
+  for(const [theme,block] of Object.entries(blocks)){
+    const tokens=readTokens(block);
+    for(const [foreground,background] of pairs){
+      assert.ok(contrast(tokens[foreground],tokens[background])>=4.5,`${theme} ${foreground} on ${background} meets 4.5 to 1`);
+    }
+  }
 });
 
 test("all active product, planning, and repository text contains no em dashes",()=>{
@@ -672,6 +720,7 @@ test("a language spells counted nouns with the forms it actually distinguishes",
 test("registered language packs have identical keys and placeholders",()=>{
   const enKeys=Object.keys(app.I18N.en).sort();
   const placeholders=value=>Array.from(String(value).matchAll(/\{([A-Za-z0-9_]+)\}/g),m=>m[1]).sort();
+  assert.equal(enKeys.length,434,"the documented complete catalog size stays exact");
   assert.equal("confirm.import" in app.I18N.en,false);
   assert.deepEqual(Array.from(app.SUPPORTED_LOCALES),["en","fr","es","de","ar"]);
   // A language may add the count forms English does not distinguish. Everything

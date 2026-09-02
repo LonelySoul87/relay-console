@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security or privacy report
+    url: https://github.com/LonelySoul87/relay-console/blob/main/SECURITY.md
+    about: Do not disclose suspected security or privacy vulnerabilities in a public issue.

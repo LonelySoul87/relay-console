@@ -177,7 +177,7 @@ Support is optional. Relay Console remains free, offline, and usable without acc
 
 ## Contributing
 
-Issues and pull requests welcome, especially provider-list updates that follow the four rules above. Because the whole thing is one file with no build, a change is just an edit to that file.
+[Bug reports and feature requests](https://github.com/LonelySoul87/relay-console/issues/new/choose) are welcome, especially provider-list updates that follow the four rules above. GitHub issues are public, so do not attach private questions, answers, provider conversations, or Relay Console session files. Because the whole thing is one file with no build, a change is just an edit to that file.
 
 Contributions require agreement to the [Contributor License Agreement](CLA.md), which lets the maintainer include your work in both the GPL and commercial editions while you keep ownership of it. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 

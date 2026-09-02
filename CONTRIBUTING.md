@@ -26,7 +26,7 @@ Pull requests to the built-in `PROVIDERS` list are welcome when they follow the 
 
 ## Issues
 
-Bug reports and feature ideas are welcome through the issue tracker. For anything touching state, persistence, or what gets sent between models, a short description of the steps to reproduce helps a lot.
+Bug reports and feature ideas are welcome through the [guided issue forms](https://github.com/LonelySoul87/relay-console/issues/new/choose). For anything touching state, persistence, or what gets sent between models, a short description of the steps to reproduce helps a lot. GitHub issues are public, so do not include private questions, answers, provider conversations, or session files.
 
 ## Security reports
 

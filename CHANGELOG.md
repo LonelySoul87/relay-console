@@ -120,16 +120,20 @@ right-to-left interface support.
 
 ### Review status
 
-- All 356 automated checks pass across the current and historical suites.
+- All 358 automated checks pass across the current and historical suites.
 - Live German and Arabic desktop, 390-pixel, and 320-pixel browser checks pass
   without clipping, horizontal overflow, warning, or error.
-- An evidence-backed agent review has resolved the known German and Arabic
-  wording defects. Fluent-human sign-off remains recommended for native tone and
-  regional preference.
+- An evidence-backed reciprocal agent review has resolved the known German and
+  Arabic wording defects. Native-tone and regional-preference feedback remains
+  welcome through the public issue forms after release.
 - No physical touchscreen or screen-reader listening session has been completed.
   The development machine reports no touch digitizer. Automated focus,
   accessible-name, live-region, keyboard, target-size, and reflow checks pass,
-  but do not replace those two manual checks.
+  while the two unavailable human checks remain documented post-release
+  feedback areas rather than release blockers.
+- Added privacy-aware GitHub bug and feature forms and a localized in-app link
+  to the issue chooser. Public reports warn against including private relay
+  content, while suspected security or privacy vulnerabilities stay private.
 
 ## v2.4.0
 
